@@ -1,0 +1,24 @@
+{
+  "name": "harite",
+  "description": "The message broadcasting server of Tuppari (= experimental implimentation of unbreakable message broadcasting system using WebSocket and Amazon Web Services)",
+  "version": "0.1.0",
+  "author": "Kazuyuki Honda <hakobera@gmail.com>",
+  "dependencies": {
+  },
+  "devDependencies": {
+    "mocha": "*",
+    "should": "*"
+  },
+  "keyword": [ "tuppari", "WebSocket", "aws" ],
+  "repository": "git://github.com/hakobera/tuppari-servers",
+  "scripts": {
+    "start": "node app.js",
+    "test": "make test"
+  },
+  "config": {
+    "PORT": 5100
+  },
+  "engines": {
+    "node": ">= 0.6.0"
+  }
+}
