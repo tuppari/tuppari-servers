@@ -65,6 +65,7 @@ function splitKey(key) {
 /**
  * Message publisher wrapper
  *
+ * @param {Object} redis Redis module instance
  * @param {String} redisUrl Redis URL to connect
  * @constructor
  */
@@ -98,7 +99,7 @@ Pub.prototype.publish = function (applicationId, channelName, eventName, data) {
     if (typeof data === 'object') {
       val = JSON.stringify(data);
     }
-    this.emit('log', 'publish', key, val);
+    this.emit('log', 'Pub::publish', key, val);
     this.client.publish(key, val);
   }
 };
@@ -139,6 +140,7 @@ Pub.prototype.canRetry = function () {
 /**
  * Message subscriber wrapper
  *
+ * @param {Object} redis Redis module instance
  * @param {String} redisUrl Redis URL to connect
  * @constructor
  */
@@ -174,6 +176,7 @@ Sub.prototype.close = function (callback) {
   if (client && client.connected) {
     client.quit();
     client.on('end', function () {
+      self.emit('close');
       callback();
     });
   } else {
@@ -202,5 +205,14 @@ Sub.prototype.canRetry = function () {
  */
 Sub.prototype.bind = function (applicationId, channelName, eventName) {
   var key = makeKey(applicationId, channelName, eventName);
+  this.emit('log', 'Sub::bind', key);
   this.client.subscribe(key);
 };
+
+/*
+ * Pub/Sub key generation methods
+ */
+
+exports.makeKey = makeKey;
+
+exports.splitKey = splitKey;

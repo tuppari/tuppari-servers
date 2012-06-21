@@ -4,6 +4,10 @@
   "version": "0.1.0",
   "author": "Kazuyuki Honda <hakobera@gmail.com>",
   "dependencies": {
+    "ws": "0.4.18",
+    "node-uuid": "1.3.3",
+    "hiredis": "0.1.14",
+    "redis": "0.7.2"
   },
   "devDependencies": {
     "mocha": "*",
@@ -16,7 +20,8 @@
     "test": "make test"
   },
   "config": {
-    "PORT": 5100
+    "PORT": 5000,
+    "REDIS_URL": "redis://localhost"
   },
   "engines": {
     "node": ">= 0.6.0"
