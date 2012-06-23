@@ -2,7 +2,6 @@ var
   wss = require('./lib/wss'),
   Sub = require('../common/lib/pubsub').Sub,
   env = require('../common/lib/env'),
-  http = require('http'),
   util = require('util'),
   redis = require('redis');
 
@@ -10,8 +9,8 @@ var
  * WebSocket settings.
  */
 
-var io = wss.listen(env('PORT'), function () {
-  console.log('harite server listen on %d', io.server.address().port);
+var io = wss.listen(env('PORT'), function (server, hostName, port) {
+  console.log('harite server (%s) listen on %d', hostName, port);
 });
 
 var sub = new Sub(redis, env('REDIS_URL'));
@@ -36,7 +35,7 @@ io.on('connection', function (socket) {
  */
 
 sub.on('error', function (err) {
-  console.error('redis client on error: ' + util.inspect(err, true));
+  console.error('subscriber error: ' + util.inspect(err, true));
 });
 
 sub.on('message', function (applicationId, channelName, eventName, data) {
