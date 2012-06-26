@@ -13,10 +13,11 @@ var Socket = module.exports = function (manager, client) {
   var self = this;
 
   client.on('message', function (message) {
+    self.emit('log', 'Socket::client::message', message);
     self._parse(message, function (err, event, applicationId, data) {
       if (err) {
         // ignore error
-        self.emit('log', 'error', err);
+        self.emit('log', 'Socket::error', err);
         return;
       }
       self.emit('log', 'Socket::message', event, applicationId, data);
@@ -25,9 +26,8 @@ var Socket = module.exports = function (manager, client) {
   });
 
   client.on('close', function() {
-    manager.disconnect(self, function () {
-      self.emit('close');
-    });
+    manager.disconnect(self);
+    self.emit('close');
   });
 
   self.id = uuid.v1().toString();

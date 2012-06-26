@@ -154,6 +154,7 @@ var Sub = exports.Sub = function (redis, redisUrl) {
   });
 
   client.on('message', function (key, message) {
+    console.log('Sub:message', key, message);
     var keys = splitKey(key);
     self.emit('message', keys[0], keys[1], keys[2], message);
   });

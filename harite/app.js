@@ -35,12 +35,13 @@ io.on('connection', function (socket) {
  */
 
 sub.on('error', function (err) {
-  console.error('subscriber error: ' + util.inspect(err, true));
+  console.error('Sub:error: ' + util.inspect(err, true));
+  console.log(err.stack);
 });
 
 sub.on('message', function (applicationId, channelName, eventName, data) {
   var key = applicationId + ':' + channelName + ':' + eventName;
-  this.emit('log', 'message', key, data);
+  console.log('message', key, data);
   io.broadcast(key, data);
 });
 

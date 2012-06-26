@@ -38,6 +38,8 @@ exports.listen = function (port, options, callback) {
   server.on('request', function (req, res) {
     res.writeHead(200, {
       'Content-Type': 'text/plain',
+      'Access-Control-Allow-Origin': '*',
+      'Access-Control-Expose-Headers': 'X-Harite-Endpoint',
       'X-Harite-Endpoint': wsUrl
     });
     res.end('Welcome to tuppari push server.');

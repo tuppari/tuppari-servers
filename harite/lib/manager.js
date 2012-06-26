@@ -43,7 +43,7 @@ util.inherits(Manager, EventEmitter);
  *
  * @param {Socket} socket Disconnected socket
  */
-Manager.prototype.disconnect = function (socket, callback) {
+Manager.prototype.disconnect = function (socket) {
   var self = this;
   var keys = Object.keys(self.rooms);
 
@@ -52,8 +52,6 @@ Manager.prototype.disconnect = function (socket, callback) {
   }
 
   delete self.sockets[socket.id];
-
-  callback();
 };
 
 /**
@@ -76,9 +74,7 @@ Manager.prototype.addToRoom = function (roomName, socketId) {
  * @param {String} socketId ID of socket to remove.
  */
 Manager.prototype.removeFromRoom = function (roomName, socketId) {
-  var self = this;
-  var room = self.rooms[roomName];
-
+  var room = this.rooms[roomName];
   if (room) {
     delete room[socketId];
   }
@@ -99,17 +95,18 @@ Manager.prototype.broadcast = function (roomName, message) {
   if (this.rooms[roomName]) {
     var sockets = this.sockets;
     var keys = Object.keys(this.rooms[roomName]);
-    var key, socket, msg, i, l;
+    var msg = {
+      room: roomName,
+      message: message
+    };
+    var key, socket, i, l;
 
     for (i = 0, l = keys.length; i < l; i++) {
       key = keys[i];
       socket = sockets[key];
-      msg = {
-        room: roomName,
-        message: message
-      };
-
-      socket.json(msg, ignoreError);
+      if (socket) {
+        socket.json(msg, ignoreError);
+      }
     }
   }
 };
