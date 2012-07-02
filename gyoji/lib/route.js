@@ -1,12 +1,13 @@
 var Router = require('router-line').Router,
+  parse = require('./parse'),
+  redis = require('redis'),
+  uuid = require('node-uuid'),
   package = require('../package.json'),
   env = require('../../common/lib/env'),
   pubsub = require('../../common/lib/pubsub'),
-  parse = require('./parse'),
-  redis = require('redis'),
-  uuid = require('node-uuid');
-
-console.log(redis);
+  validation = require('./validation'),
+  db = require('./db')
+;
 
 var router = module.exports = new Router();
 
@@ -30,24 +31,23 @@ router.add('GET', '/info', {
  * @url POST /accounts/register
  */
 router.add('POST', '/accounts/register', function (req, res) {
-  parse.json(req, res, function (body) {
+  parse.json(req, res, function (err, body) {
+    if (err) {
+      return res.badRequest(err.message);
+    }
+
     var accountName = body.accountName,
       password = body.password;
 
-    res.json({
-      id: accountName
-    });
-
-    /*
-    if (!required(accountName) || !required(passwd)) {
+    if (!validation.required(accountName) || !validation.required(password)) {
       return res.badRequest('Account name and password is required.');
     }
 
-    if (!minlen(accountName, 3)) {
+    if (!validation.minlen(accountName, 3)) {
       return res.badRequest('Account length must be greater than 3.');
     }
 
-    if (!minlen(passwd, 6)) {
+    if (!validation.minlen(password, 6)) {
       return res.badRequest('Password length must be greater than 6.');
     }
 
@@ -55,19 +55,16 @@ router.add('POST', '/accounts/register', function (req, res) {
       if (exist) {
         res.badRequest(accountName + ' is already exists.');
       } else {
-        db.account.regist(accountName, passwd, function (err, account) {
+        db.account.create(accountName, password, function (err, account) {
           if (err) {
             console.error(err);
             res.json(500, 'Unexpeced error');
           } else {
-            res.json({
-              id: account.id
-            });
+            res.json(account);
           }
         });
       }
     });
-    */
   });
 });
 
@@ -78,7 +75,11 @@ router.add('POST', '/accounts/register', function (req, res) {
  * @url POST /accounts/auth
  */
 router.add('POST', '/accounts/auth', function (req, res) {
-  parse.json(req, res, function (body) {
+  parse.json(req, res, function (err, body) {
+    if (err) {
+      return res.badRequest(err.message);
+    }
+
     var accountName = body.accountName,
       password = body.password;
 

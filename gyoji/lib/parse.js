@@ -3,7 +3,7 @@
  * If parse failed, callback is not called and return error response to client.
  *
  * @param {http.ServerRequest} req HTTP request
- * @param {Function(body)} callback
+ * @param {Function(err, body)} callback
  */
 exports.json = function (req, res, callback) {
   req.setEncoding('utf8');
@@ -11,11 +11,14 @@ exports.json = function (req, res, callback) {
 
   var contentType = req.headers['content-type'];
   if (contentType !== 'application/json') {
-    res.badRequest('Content-Type must be application/json, but ' + contentType);
+    process.nextTick(function () {
+      var msg = 'Content-Type must be application/json, but ' + contentType;
+      callback(new Error(msg));
+    });
   }
 
   req.on('error', function (err) {
-    res.badRequest(err);
+    callback(err);
   });
 
   req.on('data', function (chunk) {
@@ -25,9 +28,9 @@ exports.json = function (req, res, callback) {
   req.on('end', function () {
     try {
       var obj = JSON.parse(body);
-      callback(obj);
+      callback(null, obj);
     } catch (e) {
-      res.badRequest(e);
+      callback(e);
     }
   });
 }
