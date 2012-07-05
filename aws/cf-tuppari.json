@@ -1,0 +1,574 @@
+{
+  "AWSTemplateFormatVersion": "2010-09-09",
+
+  "Description": "CloudFormation AutoScale Template for Node.js. **WARNING** This template creates an Amazon EC2 instance. You will be billed for the AWS resources used if you create a stack from this template.",
+
+  "Parameters": {
+    "GyojiServerInstanceType": {
+      "Description": "Gyoji server instance type",
+      "Type": "String",
+      "Default": "t1.micro",
+      "AllowedValues": ["t1.micro", "m1.small", "m1.medium", "m1.large", "m1.xlarge", "m2.xlarge", "m2.2xlarge", "m2.4xlarge", "c1.medium", "c1.xlarge"],
+      "ConstraintDescription": "must be a valid EC2 instance type."
+    },
+
+    "HariteServerInstanceType": {
+      "Description": "Harite server instance type",
+      "Type": "String",
+      "Default": "t1.micro",
+      "AllowedValues": ["t1.micro", "m1.small", "m1.medium", "m1.large", "m1.xlarge", "m2.xlarge", "m2.2xlarge", "m2.4xlarge", "c1.medium", "c1.xlarge"],
+      "ConstraintDescription": "must be a valid EC2 instance type."
+    },
+
+    "RedisServerInstanceType": {
+      "Description": "Redis server instance type",
+      "Type": "String",
+      "Default": "m1.small",
+      "AllowedValues": ["t1.micro", "m1.small", "m1.medium", "m1.large", "m1.xlarge", "m2.xlarge", "m2.2xlarge", "m2.4xlarge", "c1.medium", "c1.xlarge"],
+      "ConstraintDescription": "must be a valid EC2 instance type."
+    },
+
+    "RootDeviceType": {
+      "Description": "EC2 root device type ('ebs' or 'instanceStore')",
+      "Type": "String",
+      "Default": "ebs",
+      "AllowedValues": ["ebs", "instanceStore"],
+      "ConstraintDescription": "must be 'ebs' or 'instanceStore."
+    },
+
+    "KeyName": {
+      "Description": "Name of an existing EC2 KeyPair to enable SSH access to the application server.",
+      "Type": "String"
+    },
+
+    "GyojiServerPort": {
+      "Description": "TCP/IP port of the administration server.",
+      "Type": "Number",
+      "Default": 3000,
+      "MinValue": 1025,
+      "ConstraintDescription": "must be number and greater than well-known port number (> 1024)."
+    },
+
+    "HariteServerPort": {
+      "Description": "TCP/IP port of the broadcast server.",
+      "Type": "Number",
+      "Default": 3000,
+      "MinValue": 1025,
+      "ConstraintDescription": "must be number and greater than well-known port number (> 1024)."
+    },
+
+    "RedisServerPort": {
+      "Description": "TCP/IP port of the redis server.",
+      "Type": "Number",
+      "Default": 6379,
+      "MinValue": 1025,
+      "ConstraintDescription": "must be number and greater than well-known port number (> 1024)."
+    },
+
+    "AppRepoURL": {
+      "Description": "Application Git Repository URL",
+      "Type": "String",
+      "MinLength": "1",
+      "ConstraintDescription": " is required."
+    }
+  },
+
+  "Mappings": {
+
+    "AWSRegionArch2AMI": {
+      "us-east-1": {
+        "ebs": "ami-e565ba8c",
+        "instanceStore": "ami-f565ba9c"
+      },
+      "us-west-2": {
+        "ebs": "ami-3ac64a0a",
+        "instanceStore": "ami-30c64a00"
+      },
+      "us-west-1": {
+        "ebs": "ami-e78cd4a2",
+        "instanceStore": "ami-d98cd49c"
+      },
+      "eu-west-1": {
+        "ebs": "ami-f9231b8d",
+        "instanceStore": "ami-ff231b8b"
+      },
+      "ap-southeast-1": {
+        "ebs": "ami-be3374ec",
+        "instanceStore": "ami-b23374e0"
+      },
+      "ap-northeast-1": {
+        "ebs": "ami-e47acbe5",
+        "instanceStore": "ami-047bca05"
+      },
+      "sa-east-1": {
+        "ebs": "ami-a6855bbb",
+        "instanceStore": "ami-ae855bb3"
+      }
+    }
+  },
+
+  "Resources": {
+    "CfnUser": {
+      "Type": "AWS::IAM::User",
+      "Properties": {
+        "Path": "/",
+        "Policies": [
+          {
+            "PolicyName": "root",
+            "PolicyDocument": {
+              "Statement": [
+                {
+                  "Effect": "Allow",
+                  "Action": "cloudformation:DescribeStackResource",
+                  "Resource": "*"
+                }
+              ]
+            }
+          }
+        ]
+      }
+    },
+
+    "HostKeys": {
+      "Type": "AWS::IAM::AccessKey",
+      "Properties": {
+        "UserName": {
+          "Ref": "CfnUser"
+        }
+      }
+    },
+
+    "WaitHandle": {
+      "Type": "AWS::CloudFormation::WaitConditionHandle"
+    },
+
+    "GyojiServerLaunchConfig": {
+      "Type" : "AWS::AutoScaling::LaunchConfiguration",
+      "Metadata": {
+        "AWS::CloudFormation::Init": {
+          "config": {
+            "packages": {
+              "rpm" : {
+                "nodejs" : "http://nodejs.tchol.org/repocfg/amzn1/nodejs-stable-release.noarch.rpm"
+              },
+              "yum": {
+                "gcc-c++": [],
+                "make": [],
+                "git" : [],
+                "nodejs-compat-symlinks": [],
+                "npm": []
+              }
+            },
+
+            "sources" : {
+              "/var/opt/tuppari" : { "Ref": "AppRepoURL" }
+            }
+          }
+        }
+      },
+      "Properties": {
+        "ImageId": { "Fn::FindInMap": [ "AWSRegionArch2AMI", { "Ref": "AWS::Region" }, { "Ref": "RootDeviceType" } ] },
+        "InstanceType": { "Ref": "GyojiServerInstanceType" },
+        "SecurityGroups": [ { "Ref": "GyojiServerSecurityGroup" } ],
+        "KeyName": { "Ref": "KeyName" },
+        "UserData": {
+          "Fn::Base64": {
+            "Fn::Base64": {
+              "Fn::Join": ["", [
+                "#!/bin/bash -v\n",
+                "yum update -y aws-cfn-bootstrap\n",
+
+                "# Helper function\n",
+                "function error_exit\n",
+                "{\n",
+                "  /opt/aws/bin/cfn-signal -e 1 -r \"$1\" '", { "Ref": "WaitHandle" }, "'\n",
+                "  exit 1\n",
+                "}\n",
+
+                "# Install packages\n",
+                "/opt/aws/bin/cfn-init -s ", { "Ref": "AWS::StackName" }, " -r GyojiServerLaunchConfig ",
+                "    --access-key ", { "Ref": "HostKeys" },
+                "    --secret-key ", { "Fn::GetAtt": ["HostKeys", "SecretAccessKey"] },
+                "    --region ", { "Ref": "AWS::Region" }, " || error_exit 'Failed to run cfn-init'\n",
+
+                "ulimit -n 65535\n",
+
+                "# Start application\n",
+                "cd /var/opt/tuppari/gyoji\n",
+                "npm config set gyoji:PORT ", { "Ref": "GyojiServerPort" } ,"\n",
+                "npm config set gyoji:REDIS_URL ", { "Fn::Join" : [ "", [ "redis://", { "Fn::GetAtt" : [ "RedisServer", "PrivateIp" ]}, ":", { "Ref": "RedisServerPort" }]]}, "\n",
+                "npm install --production\n",
+                "NODE_ENV=production npm start > gyoji.log 2>&1 &\n",
+
+                "# All is well so signal success\n",
+                "/opt/aws/bin/cfn-signal -e 0 -r \"GyojiServer setup complete\" '", { "Ref": "WaitHandle" }, "'\n"
+              ]]
+            }
+          }
+        }
+      }
+    },
+
+    "GyojiServerGroup" : {
+      "Type" : "AWS::AutoScaling::AutoScalingGroup",
+      "Properties" : {
+        "AvailabilityZones" : [ { "Fn::Join" : [ "", [{ "Ref": "AWS::Region" }, "a"]]} ],
+        "LaunchConfigurationName" : { "Ref" : "GyojiServerLaunchConfig" },
+        "MinSize" : "1",
+        "MaxSize" : "1",
+        "LoadBalancerNames" : [ { "Ref" : "GyojiServerElasticLoadBalancer" } ],
+        "Tags" : [
+          {
+            "Key" : "Name",
+            "Value" : { "Fn::Join" : [ "", [ { "Ref": "AWS::StackName" }, "::GyojiServer" ]] },
+            "PropagateAtLaunch" : "true"
+          }
+        ]
+      }
+    },
+
+    "GyojiServerElasticLoadBalancer" : {
+      "Type" : "AWS::ElasticLoadBalancing::LoadBalancer",
+      "Properties" : {
+        "AvailabilityZones" : [ { "Fn::Join" : [ "", [{ "Ref": "AWS::Region" }, "a"]]} ],
+        "Listeners" : [
+          {
+            "LoadBalancerPort" : "80",
+            "InstancePort" : { "Ref" : "GyojiServerPort" },
+            "Protocol" : "HTTP"
+          }
+        ],
+        "HealthCheck" : {
+          "Target" : { "Fn::Join" : [ "", ["HTTP:", { "Ref" : "GyojiServerPort" }, "/info"]]},
+          "HealthyThreshold" : "3",
+          "UnhealthyThreshold" : "5",
+          "Interval" : "10",
+          "Timeout" : "5"
+        }
+      }
+    },
+
+    "GyojiServerSecurityGroup": {
+      "Type": "AWS::EC2::SecurityGroup",
+      "Properties": {
+        "GroupDescription": "Enable HTTP access",
+        "SecurityGroupIngress": [
+          {
+            "IpProtocol": "tcp",
+            "FromPort": 22,
+            "ToPort": 22,
+            "CidrIp": "0.0.0.0/0"
+          },
+          {
+            "IpProtocol": "tcp",
+            "FromPort": { "Ref": "GyojiServerPort" },
+            "ToPort": { "Ref": "GyojiServerPort" },
+            "SourceSecurityGroupOwnerId" : {"Fn::GetAtt" : ["GyojiServerElasticLoadBalancer", "SourceSecurityGroup.OwnerAlias"]},
+            "SourceSecurityGroupName" : {"Fn::GetAtt" : ["GyojiServerElasticLoadBalancer", "SourceSecurityGroup.GroupName"]}
+          }
+        ]
+      }
+    },
+
+    "HariteServerLaunchConfig": {
+      "Type" : "AWS::AutoScaling::LaunchConfiguration",
+      "Metadata": {
+        "AWS::CloudFormation::Init": {
+          "config": {
+            "packages": {
+              "rpm" : {
+                "nodejs" : "http://nodejs.tchol.org/repocfg/amzn1/nodejs-stable-release.noarch.rpm"
+              },
+              "yum": {
+                "gcc-c++": [],
+                "make": [],
+                "git" : [],
+                "nodejs-compat-symlinks": [],
+                "npm": []
+              }
+            },
+
+            "sources" : {
+              "/var/opt/tuppari" : { "Ref": "AppRepoURL" }
+            }
+          }
+        }
+      },
+      "Properties": {
+        "ImageId": { "Fn::FindInMap": [ "AWSRegionArch2AMI", { "Ref": "AWS::Region" }, { "Ref": "RootDeviceType" } ] },
+        "InstanceType": { "Ref": "HariteServerInstanceType" },
+        "SecurityGroups": [ { "Ref": "HariteServerSecurityGroup" } ],
+        "KeyName": { "Ref": "KeyName" },
+        "UserData": {
+          "Fn::Base64": {
+            "Fn::Base64": {
+              "Fn::Join": ["", [
+                "#!/bin/bash -v\n",
+                "yum update -y aws-cfn-bootstrap\n",
+
+                "# Helper function\n",
+                "function error_exit\n",
+                "{\n",
+                "  /opt/aws/bin/cfn-signal -e 1 -r \"$1\" '", { "Ref": "WaitHandle" }, "'\n",
+                "  exit 1\n",
+                "}\n",
+
+                "# Install packages\n",
+                "/opt/aws/bin/cfn-init -s ", { "Ref": "AWS::StackName" }, " -r HariteServerLaunchConfig ",
+                "    --access-key ", { "Ref": "HostKeys" },
+                "    --secret-key ", { "Fn::GetAtt": ["HostKeys", "SecretAccessKey"] },
+                "    --region ", { "Ref": "AWS::Region" }, " || error_exit 'Failed to run cfn-init'\n",
+
+                "ulimit -n 65535\n",
+
+                "# Start application\n",
+                "cd /var/opt/tuppari/harite\n",
+                "npm config set harite:HOST_NAME `curl http://169.254.169.254/latest/meta-data/public-hostname`", "\n",
+                "npm config set harite:PORT ", { "Ref": "HariteServerPort" }, "\n",
+                "npm config set harite:REDIS_URL ", { "Fn::Join" : [ "", [ "redis://", { "Fn::GetAtt" : [ "RedisServer", "PrivateIp" ]}, ":", { "Ref": "RedisServerPort" }]]}, "\n",
+                "npm install --production\n",
+                "NODE_ENV=production npm start > harite.log 2>&1 &\n",
+
+                "# All is well so signal success\n",
+                "/opt/aws/bin/cfn-signal -e 0 -r \"HariteServer setup complete\" '", { "Ref": "WaitHandle" }, "'\n"
+              ]]
+            }
+          }
+        }
+      }
+    },
+
+    "HariteServerGroup" : {
+      "Type" : "AWS::AutoScaling::AutoScalingGroup",
+      "Properties" : {
+        "AvailabilityZones" : [ { "Fn::Join" : [ "", [{ "Ref": "AWS::Region" }, "a"]]} ],
+        "LaunchConfigurationName" : { "Ref" : "HariteServerLaunchConfig" },
+        "MinSize" : "1",
+        "MaxSize" : "10",
+        "LoadBalancerNames" : [ { "Ref" : "HariteServerElasticLoadBalancer" } ],
+        "Tags" : [
+          {
+            "Key" : "Name",
+            "Value" : { "Fn::Join" : [ "", [ { "Ref": "AWS::StackName" }, "::HariteServer" ]] },
+            "PropagateAtLaunch" : "true"
+          }
+        ]
+      }
+    },
+
+    "HariteServerScaleUpPolicy" : {
+      "Type" : "AWS::AutoScaling::ScalingPolicy",
+      "Properties" : {
+        "AdjustmentType" : "ChangeInCapacity",
+        "AutoScalingGroupName" : { "Ref" : "HariteServerGroup" },
+        "Cooldown" : "60",
+        "ScalingAdjustment" : "1"
+      }
+    },
+
+    "HariteServerScaleDownPolicy" : {
+      "Type" : "AWS::AutoScaling::ScalingPolicy",
+      "Properties" : {
+        "AdjustmentType" : "ChangeInCapacity",
+        "AutoScalingGroupName" : { "Ref" : "HariteServerGroup" },
+        "Cooldown" : "60",
+        "ScalingAdjustment" : "-1"
+      }
+    },
+
+    "HariteServerElasticLoadBalancer" : {
+      "Type" : "AWS::ElasticLoadBalancing::LoadBalancer",
+      "Properties" : {
+        "AvailabilityZones" : [ { "Fn::Join" : [ "", [{ "Ref": "AWS::Region" }, "a"]]} ],
+        "Listeners" : [
+          {
+            "LoadBalancerPort" : "80",
+            "InstancePort" : { "Ref" : "HariteServerPort" },
+            "Protocol" : "TCP"
+          }
+        ],
+        "HealthCheck" : {
+          "Target" : { "Fn::Join" : [ "", ["HTTP:", { "Ref" : "HariteServerPort" }, "/"]]},
+          "HealthyThreshold" : "3",
+          "UnhealthyThreshold" : "5",
+          "Interval" : "10",
+          "Timeout" : "5"
+        }
+      }
+    },
+
+    "HariteServerSecurityGroup": {
+      "Type": "AWS::EC2::SecurityGroup",
+      "Properties": {
+        "GroupDescription": "Enable HTTP access",
+        "SecurityGroupIngress": [
+          {
+            "IpProtocol": "tcp",
+            "FromPort": 22,
+            "ToPort": 22,
+            "CidrIp": "0.0.0.0/0"
+          },
+          {
+            "IpProtocol": "tcp",
+            "FromPort": { "Ref": "HariteServerPort" },
+            "ToPort": { "Ref": "HariteServerPort" },
+            "CidrIp": "0.0.0.0/0"
+          }
+        ]
+      }
+    },
+
+    "RedisServer": {
+      "Type": "AWS::EC2::Instance",
+      "Metadata": {
+        "AWS::CloudFormation::Init": {
+          "config": {
+            "packages": {
+              "rpm" : {
+                "epel" : "http://ftp.jaist.ac.jp/pub/Linux/Fedora/epel/6/i386/epel-release-6-7.noarch.rpm"
+              },
+              "yum": {
+                "redis" : []
+              }
+            },
+
+            "services" : {
+              "sysvinit" : {
+                "redis" : {
+                  "enabled" : "true",
+                  "ensureRunning" : "false"
+                }
+              }
+            }
+          }
+        }
+      },
+
+      "Properties": {
+        "ImageId": { "Fn::FindInMap": [ "AWSRegionArch2AMI", { "Ref": "AWS::Region" }, "ebs" ] },
+        "InstanceType": { "Ref": "RedisServerInstanceType" },
+        "SecurityGroups": [ { "Ref": "RedisServerSecurityGroup" } ],
+        "AvailabilityZone" : { "Fn::Join" : [ "", [{ "Ref": "AWS::Region" }, "a"]]},
+        "KeyName": { "Ref": "KeyName" },
+        "Tags" : [
+          {
+            "Key" : "Name",
+            "Value" : { "Fn::Join" : [ "", [ { "Ref": "AWS::StackName" }, "::RedisServer" ]] }
+          }
+        ],
+        "UserData": {
+          "Fn::Base64": {
+            "Fn::Join": ["", [
+              "#!/bin/bash -v\n",
+              "yum update -y aws-cfn-bootstrap\n",
+
+              "# Helper function\n",
+              "function error_exit\n",
+              "{\n",
+              "  /opt/aws/bin/cfn-signal -e 1 -r \"$1\" '", { "Ref": "WaitHandle" }, "'\n",
+              "  exit 1\n",
+              "}\n",
+
+              "# Install packages\n",
+              "/opt/aws/bin/cfn-init -s ", { "Ref": "AWS::StackName" }, " -r RedisServer ",
+              "    --access-key ", { "Ref": "HostKeys" },
+              "    --secret-key ", { "Fn::GetAtt": ["HostKeys", "SecretAccessKey"] },
+              "    --region ", { "Ref": "AWS::Region" }, " || error_exit 'Failed to run cfn-init'\n",
+
+              "sed -i -e 's/bind 127.0.0.1/#bind 127.0.0.1/' /etc/redis.conf\n",
+              "service redis restart\n",
+
+              "# All is well so signal success\n",
+              "/opt/aws/bin/cfn-signal -e 0 -r \"HariteServer setup complete\" '", { "Ref": "WaitHandle" }, "'\n"
+            ]]
+          }
+        }
+      }
+    },
+
+    "RedisServerSecurityGroup": {
+      "Type": "AWS::EC2::SecurityGroup",
+      "Properties": {
+        "GroupDescription": "Enable Redis access",
+        "SecurityGroupIngress": [
+          {
+            "IpProtocol": "tcp",
+            "FromPort": 22,
+            "ToPort": 22,
+            "CidrIp": "0.0.0.0/0"
+          },
+          {
+            "IpProtocol": "tcp",
+            "FromPort": { "Ref": "RedisServerPort" },
+            "ToPort": { "Ref": "RedisServerPort" },
+            "SourceSecurityGroupName" : { "Ref" : "GyojiServerSecurityGroup" }
+          },
+          {
+            "IpProtocol": "tcp",
+            "FromPort": { "Ref": "RedisServerPort" },
+            "ToPort": { "Ref": "RedisServerPort" },
+            "SourceSecurityGroupName" : { "Ref" : "HariteServerSecurityGroup" }
+          }
+        ]
+      }
+    },
+
+    "CPUAlarmHigh": {
+     "Type": "AWS::CloudWatch::Alarm",
+     "Properties": {
+        "AlarmDescription": "Scale-up if CPU > 90% for 10 minutes",
+        "MetricName": "CPUUtilization",
+        "Namespace": "AWS/EC2",
+        "Statistic": "Average",
+        "Period": "120",
+        "EvaluationPeriods": "2",
+        "Threshold": "90",
+        "AlarmActions": [ { "Ref": "HariteServerScaleUpPolicy" } ],
+        "Dimensions": [
+          {
+            "Name": "AutoScalingGroupName",
+            "Value": { "Ref": "HariteServerGroup" }
+          }
+        ],
+        "ComparisonOperator": "GreaterThanThreshold"
+      }
+    },
+
+    "CPUAlarmLow": {
+     "Type": "AWS::CloudWatch::Alarm",
+     "Properties": {
+        "AlarmDescription": "Scale-down if CPU < 70% for 10 minutes",
+        "MetricName": "CPUUtilization",
+        "Namespace": "AWS/EC2",
+        "Statistic": "Average",
+        "Period": "120",
+        "EvaluationPeriods": "2",
+        "Threshold": "60",
+        "AlarmActions": [ { "Ref": "HariteServerScaleDownPolicy" } ],
+        "Dimensions": [
+          {
+            "Name": "AutoScalingGroupName",
+            "Value": { "Ref": "HariteServerGroup" }
+          }
+        ],
+        "ComparisonOperator": "LessThanThreshold"
+      }
+    }
+
+  },
+
+  "Outputs": {
+    "GyojiServerURL" : {
+      "Description" : "URL of the admin app.",
+      "Value" :  { "Fn::Join" : [ "", [ "http://", { "Fn::GetAtt" : [ "GyojiServerElasticLoadBalancer", "DNSName" ]}]]}
+    },
+    "HariteServerURL" : {
+      "Description" : "URL of the broadcast app",
+      "Value" :  { "Fn::Join" : [ "", [ "http://", { "Fn::GetAtt" : [ "HariteServerElasticLoadBalancer", "DNSName" ]}]]}
+    },
+    "RedisURL": {
+      "Description": "URL of redis",
+      "Value": { "Fn::Join" : [ "", [ "redis://", { "Fn::GetAtt" : [ "RedisServer", "PrivateIp" ]}, ":", { "Ref": "RedisServerPort" }]]}
+    }
+  }
+}
