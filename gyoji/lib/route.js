@@ -83,15 +83,16 @@ router.add('POST', '/accounts/auth', function (req, res) {
     var accountName = body.accountName,
       password = body.password;
 
-    var credentialId = uuid.v1();
-    var credentialSecret = uuid.v4();
+    db.account.login(accountName, password, function (err, account) {
+      if (err) return res.badRequest(err.message);
 
-    res.json({
-      id: accountName,
-      credentials: {
-        id: credentialId,
-        secret: credentialSecret
-      }
+      res.json({
+        accountName: accountName,
+        credentials: {
+          id: accountName,
+          secret: account.credentials
+        }
+      });
     });
   });
 });
@@ -100,21 +101,34 @@ router.add('POST', '/accounts/auth', function (req, res) {
  * Application create API endpoint.
  * Create a new application.
  *
- * @url POST /apps
+ * @url POST /applications
  */
-router.add('POST', '/apps', function (req, res) {
-  parse.json(req, res, function (body) {
-    var applicationName = body.applicationName;
+router.add('POST', '/applications', function (req, res) {
+  parse.json(req, res, function (err, body) {
+    if (err) {
+      return res.badRequest(err.message);
+    }
 
-    var applicationId = uuid.v1();
-    var accessKeyId = uuid.v4();
-    var accessSecretKey = uuid.v4();
+    var accountId = req.param('public_key');
+    db.account.find(accountId, function (err, account) {
+      if (err) return res.badRequest(err.message);
 
-    res.json({
-      applicationName: applicationName,
-      applicationId: applicationId,
-      accessKeyId: accessKeyId,
-      accessSecretKey: accessSecretKey
+      if (!parse.isValidRequest(req, account.credentials, body)) {
+        return res.badRequest('Invalid signature');
+      }
+
+      var applicationName = body.applicationName;
+
+      var applicationId = uuid.v1();
+      var accessKeyId = uuid.v4();
+      var accessSecretKey = uuid.v4();
+
+      res.json({
+        applicationName: applicationName,
+        applicationId: applicationId,
+        accessKeyId: accessKeyId,
+        accessSecretKey: accessSecretKey
+      });
     });
   });
 });

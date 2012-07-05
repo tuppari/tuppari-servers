@@ -1,6 +1,9 @@
-var Schema = require('./schema'),
+var
+  Schema = require('./schema'),
   util = require('util'),
-  crypto = require('crypto');
+  crypto = require('crypto'),
+  uuid = require('node-uuid')
+;
 
 /**
  * Account table.
@@ -79,9 +82,9 @@ Account.prototype.find = function (accountId, callback) {
 /**
  * Return login success or failed.
  *
- * @param accountId Account ID to login
- * @param password Account password
- * @param callback
+ * @param {String} accountId Account ID to login
+ * @param {String} password Account password
+ * @param {Function(err, account)} , accoucallback
  */
 Account.prototype.login = function (accountId, password, callback) {
   var self = this;
