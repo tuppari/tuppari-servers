@@ -38,7 +38,7 @@ var app = http.createServer(function (req, res) {
     res.json(400, obj);
   };
 
-  console.log(req.url, req.method);
+  debug(req.method, req.url);
 
   uri = url.parse(req.url, true);
   r = router.route(req.method, uri.pathname);
