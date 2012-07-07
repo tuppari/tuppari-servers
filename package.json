@@ -1,0 +1,7 @@
+{
+  "name": "tuppari-servers",
+  "version": "0.1.0",
+  "scripts": {
+    "test": "make test"
+  }
+}
