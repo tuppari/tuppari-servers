@@ -38,7 +38,7 @@ var app = http.createServer(function (req, res) {
     res.json(400, obj);
   };
 
-  debug(req.method, req.url);
+  debug(req.method, req.url, req.headers);
 
   uri = url.parse(req.url, true);
   r = router.route(req.method, uri.pathname);
@@ -55,7 +55,7 @@ var app = http.createServer(function (req, res) {
       try {
         handler(req, res, r.params);
       } catch (e) {
-        res.json(500, { resonse: 'Unexpected error', url: req.url });
+        res.json(500, { reason: 'Unexpected error', url: req.url });
       }
     } else if (typeof handler === 'string') {
       res.send(200, 'text/plain', handler);
