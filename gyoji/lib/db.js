@@ -22,6 +22,8 @@ var tables = {};
  */
 
 exports.account = schema('account');
+exports.application = schema('application');
+exports.keypair = schema('keypair');
 
 /**
  * Returns actual table name from table ID.
@@ -57,7 +59,7 @@ function createIfNotExist(tableId, callback) {
   db.get(tableName).fetch(function (err, table) {
     if (err) {
       if (err.name && err.name.indexOf('ResourceNotFoundException') !== -1) {
-        console.log('Create request for tableId = %s, options = %s', tableId, options);
+        console.log('Create request for tableId = %s, options = %s', tableId, util.inspect(options, true));
         console.log('Actual table name is %s.', tableName);
 
         options.name = tableName;

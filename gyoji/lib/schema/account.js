@@ -1,17 +1,16 @@
-var
-  Schema = require('./schema'),
+var Schema = require('./schema'),
   util = require('util'),
   crypto = require('crypto'),
-  uuid = require('node-uuid')
-;
+  uuid = require('node-uuid'),
+  passwd = require('../passwd');
 
 /**
  * Account table.
  *
  * @constructor
  */
-var Account = module.exports = function (db, tableId) {
-  Schema.call(this, db, tableId, {
+var Account = module.exports = function (db, tableName) {
+  Schema.call(this, db, tableName, {
     id: String
   });
 };
@@ -32,7 +31,7 @@ Account.prototype.create = function (accountId, password, callback) {
       callback(new Error(util.format('%s is already exists.', accountId)));
     } else {
       var salt = crypto.randomBytes(32).toString('hex');
-      stretch(password, salt, function (err, credentials) {
+      passwd.stretch(password, salt, function (err, credentials) {
         if (err) return callback(err);
 
         var now = Date.now();
@@ -103,17 +102,3 @@ Account.prototype.login = function (accountId, password, callback) {
     });
   });
 };
-
-/**
- * Stretch password with salt.
- *
- * @param password Raw password to stretch
- * @param salt Password salt
- * @param callback
- */
-function stretch(password, salt, callback) {
-  crypto.pbkdf2(password, salt, 4096, 32, function (err, key) {
-    if (err) return callback(err);
-    callback(null, new Buffer(key, 'binary').toString('hex'));
-  });
-}

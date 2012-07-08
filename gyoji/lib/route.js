@@ -83,8 +83,14 @@ router.add('POST', '/accounts/auth', function (req, res) {
     var accountName = body.accountName,
       password = body.password;
 
+    if (!validation.required(accountName) || !validation.required(password)) {
+      return res.badRequest('Account name and password is required.');
+    }
+
     db.account.login(accountName, password, function (err, account) {
-      if (err) return res.badRequest(err.message);
+      if (err) {
+        return res.json(401, { reason: 'accountName or password is wrong' });
+      }
 
       res.json({
         accountName: accountName,
@@ -98,32 +104,38 @@ router.add('POST', '/accounts/auth', function (req, res) {
 });
 
 /**
- * Application create API endpoint.
- * Create a new application.
+ * Applications API endpoint.
  *
  * @url POST /applications
  */
 router.add('POST', '/applications', function (req, res) {
   parse.json(req, res, function (err, body) {
+    console.log(err, body);
+
     if (err) {
       return res.badRequest(err.message);
     }
 
-    var accountId = req.param('public_key');
+    var auth = parse.parseAuthorizationHeader(req);
+    console.log(auth);
+
+    var accountId = auth.credential;
     db.account.find(accountId, function (err, account) {
       if (err) return res.badRequest(err.message);
 
-      if (!parse.isValidRequest(req, account.credentials, body)) {
+      if (!parse.isValidRequest(req, auth, account.credentials, body)) {
         return res.badRequest('Invalid signature');
       }
 
       var applicationName = body.applicationName;
+      var operation = req.headers['x-tuppari-operation'];
 
       var applicationId = uuid.v1();
-      var accessKeyId = uuid.v4();
-      var accessSecretKey = uuid.v4();
+      var accessKeyId = uuid.v1();
+      var accessSecretKey = uuid.v1();
 
       res.json({
+        operation: operation,
         applicationName: applicationName,
         applicationId: applicationId,
         accessKeyId: accessKeyId,

@@ -1,5 +1,7 @@
 var crypto = require('crypto'),
-  qs = require('querystring');
+  qs = require('querystring'),
+  url = require('url'),
+  sign = require('tuppari').sign;
 
 /**
  * Parse POST JSON data.
@@ -51,38 +53,74 @@ exports.json = function (req, res, callback) {
  * @param {Object} body Request body
  * @return {Boolean} The signature in the request is valid or not
  */
-exports.isValidRequest = function (req, secretKey, body) {
-  var sendSignature = req.param('auth_signature');
-  var validSignature = exports.sign(req, secretKey, body);
+exports.isValidRequest = function (req, auth, secretKey, body) {
+  var headers = req.headers;
+  var authorization = headers['authorization'];
 
-  return sendSignature === validSignature;
-};
-
-/**
- * Return signature generated from request, request body and secret key.
- *
- * @param {http.Request} req
- * @param {String} secretKey
- * @param {Object} body
- * @return {String} signature
- */
-exports.sign = function (req, secretKey, body) {
-  var params = {
-    public_key: req.param('public_key'),
-    auth_timestamp: req.param('auth_timestamp'),
-    auth_version: req.param('auth_version')
-  };
-
-  if (body) {
-    params.body_hash = crypto.createHash('md5').update(JSON.stringify(body), 'utf8').digest('hex');
+  if (!authorization) {
+    return false;
   }
 
-  var queryString = qs.stringify(params);
-  var signData = [ req.method, req.pathname, queryString ].join('\n');
+  if (!auth.signedHeaders || auth.signedHeaders.length === 0) {
+    return false;
+  }
 
-  console.log(params);
-  var signature = crypto.createHmac('sha256', secretKey).update(signData).digest('hex');
-  console.log(signature);
+  var requestDateTime = Date.parse(headers['x-tuppari-date']);
+  if (isNaN(requestDateTime)) {
+    return false;
+  }
+  var requestDate = new Date(requestDateTime);
 
-  return signature;
+  var method = req.method;
+  var uri = url.parse(req.url);
+  var hostname = headers['host'];
+  var path = uri.pathname;
+  var query = uri.query;
+
+  var signedHeaders = {};
+  var i, len, k, v;
+  for (i = 0, len = auth.signedHeaders.length; i < len; ++i) {
+    k = auth.signedHeaders[i];
+    v = headers[k];
+    if (!v) {
+      return false;
+    }
+    signedHeaders[k] = v;
+  }
+
+  var result = sign.createAuthorizationHeader(method, hostname, path, query, signedHeaders, body, requestDate, auth.credential, secretKey);
+  console.log(result);
+
+  return authorization === result;
 };
+
+exports.parseAuthorizationHeader = function (req) {
+  var authorization = req.headers['authorization'];
+  if (!authorization) {
+    return {};
+  }
+
+  var v = authorization.split(' ');
+  console.log(v);
+  var algorithm = v[0];
+  var params = splitAuthParam(v[1]);
+
+  return {
+    algorithm: algorithm,
+    credential: params['Credential'],
+    signedHeaders: params['SignedHeaders'].split(';'),
+    signature: params['Signature']
+  };
+}
+
+function splitAuthParam(authParam) {
+  var params = authParam.split(',');
+  var result = {};
+  var i, len, p, v;
+  for (i = 0, len = params.length; i < len; ++i) {
+    p = params[i];
+    v = p.split('=');
+    result[v[0]] = v[1];
+  }
+  return result;
+}

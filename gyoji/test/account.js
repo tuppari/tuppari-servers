@@ -28,10 +28,8 @@ describe('db.account', function () {
         });
       });
     })
-  })
 
-  describe('create() if same account is already exists, ', function () {
-    it('should return error', function (done) {
+    it('should return error if same account is already exists', function (done) {
       var accountId = uuid.v1();
 
       db.account.create(accountId, 'password', function (err) {
@@ -47,8 +45,8 @@ describe('db.account', function () {
     })
   })
 
-  describe('exists() if account is not exists, ', function () {
-    it('should return false', function (done) {
+  describe('exists()', function () {
+    it('should return false when account is not exists', function (done) {
       var accountId = uuid.v1();
 
       db.account.exists(accountId, function (result) {
@@ -56,10 +54,8 @@ describe('db.account', function () {
         done();
       });
     })
-  })
 
-  describe('exists() if account is already exists, ', function () {
-    it('should return true', function (done) {
+    it('should return true if account is already exists', function (done) {
       var accountId = uuid.v1();
 
       db.account.create(accountId, 'password', function (err, account) {
@@ -67,9 +63,11 @@ describe('db.account', function () {
 
         should.exist(account);
 
-        db.account.exists(accountId, function (result) {
-          result.should.be.true;
-          done();
+        process.nextTick(function() {
+          db.account.exists(accountId, function (result) {
+            result.should.be.true;
+            done();
+          });
         });
       });
     })

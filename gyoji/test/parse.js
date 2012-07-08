@@ -22,8 +22,8 @@ util.inherits(ResponseMock, EventEmitter);
 
 describe('parse', function () {
 
-  describe('json() with application/json', function () {
-    it('should callback with parsed JSON object', function (done) {
+  describe('json()', function () {
+    it('should return parsed JSON object', function (done) {
       var req = new RequestMock();
       req.headers['content-type'] = 'application/json';
 
@@ -41,10 +41,8 @@ describe('parse', function () {
       req.emit('data', '{ "key1": "value1" }');
       req.emit('end');
     })
-  })
 
-  describe('json() with application/json, but illegal format', function () {
-    it('should return badRequest', function (done) {
+    it('should return badRequest when content-type is "application/json", but body is illegal format', function (done) {
       var req = new RequestMock();
       req.headers['content-type'] = 'application/json';
 
@@ -62,10 +60,8 @@ describe('parse', function () {
       req.emit('data', '{ "key1": "value');
       req.emit('end');
     })
-  })
 
-  describe('json() with application/json, but request error occured', function () {
-    it('should return badRequest', function (done) {
+    it('should return badRequest when content-type is "application/json", but request error occured', function (done) {
       var req = new RequestMock();
       req.headers['content-type'] = 'application/json';
 
@@ -82,10 +78,8 @@ describe('parse', function () {
 
       req.emit('error', new Error('ERR'));
     })
-  })
 
-  describe('json() with non application/json', function () {
-    it('should return badRequest', function (done) {
+    it('should return badRequest when content-type is not "application/json"', function (done) {
       var req = new RequestMock();
       req.headers['content-type'] = 'text/plain';
 

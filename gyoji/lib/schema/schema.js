@@ -1,5 +1,6 @@
 var util = require('util'),
   EventEmitter = require('events').EventEmitter;
+
 /**
  * Create schema entity.
  *
@@ -10,9 +11,12 @@ var util = require('util'),
  * @constructor
  */
 var Schema = module.exports = function (db, tableName, schema) {
-  this.tableName = tableName;
   this.table = db.get(tableName);
   this.schema = schema;
+
+  this.__defineGetter__('tableName', function () {
+    return tableName;
+  });
 };
 util.inherits(Schema, EventEmitter);
 
