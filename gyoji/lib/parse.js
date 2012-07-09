@@ -40,11 +40,6 @@ exports.json = function (req, res, callback) {
   });
 };
 
-
-/**
- * Validate parameters
- */
-
 /**
  * Return the signature in the request is valid or not.
  *
@@ -89,7 +84,6 @@ exports.isValidRequest = function (req, auth, secretKey, body) {
   }
 
   var result = sign.createAuthorizationHeader(method, hostname, path, query, signedHeaders, body, requestDate, auth.credential, secretKey);
-  console.log(result);
 
   return authorization === result;
 };
@@ -101,7 +95,10 @@ exports.parseAuthorizationHeader = function (req) {
   }
 
   var v = authorization.split(' ');
-  console.log(v);
+  if (!v || v.length !== 2) {
+    return {};
+  }
+
   var algorithm = v[0];
   var params = splitAuthParam(v[1]);
 

@@ -1,13 +1,12 @@
 var Router = require('router-line').Router,
-  parse = require('./parse'),
   redis = require('redis'),
   uuid = require('node-uuid'),
+  parse = require('./parse'),
+  db = require('./db'),
   package = require('../package.json'),
   env = require('../../common/lib/env'),
   pubsub = require('../../common/lib/pubsub'),
-  validation = require('./validation'),
-  db = require('./db')
-;
+  validation = require('./validation');
 
 var router = module.exports = new Router();
 
@@ -110,16 +109,13 @@ router.add('POST', '/accounts/auth', function (req, res) {
  */
 router.add('POST', '/applications', function (req, res) {
   parse.json(req, res, function (err, body) {
-    console.log(err, body);
-
     if (err) {
       return res.badRequest(err.message);
     }
 
     var auth = parse.parseAuthorizationHeader(req);
-    console.log(auth);
-
     var accountId = auth.credential;
+
     db.account.find(accountId, function (err, account) {
       if (err) return res.badRequest(err.message);
 
@@ -130,17 +126,27 @@ router.add('POST', '/applications', function (req, res) {
       var applicationName = body.applicationName;
       var operation = req.headers['x-tuppari-operation'];
 
-      var applicationId = uuid.v1();
-      var accessKeyId = uuid.v1();
-      var accessSecretKey = uuid.v1();
+      switch (operation) {
+      case 'CreateApplication':
+        db.application.create(account.id, applicationName, function (err, app) {
+          if (err) return res.badRequest(err.message);
 
-      res.json({
-        operation: operation,
-        applicationName: applicationName,
-        applicationId: applicationId,
-        accessKeyId: accessKeyId,
-        accessSecretKey: accessSecretKey
-      });
+          db.keypair.create(app.applicationId, function (err, keypair) {
+            if (err) return res.badRequest(err);
+
+            res.json({
+              applicationName: applicationName,
+              applicationId: keypair.applicationId,
+              accessKeyId: keypair.accessKeyId,
+              accessSecretKey: keypair.accessSecretKey
+            });
+          });
+        });
+        break;
+
+      default:
+        return res.badRequest(new Error('Invalid operation "' + operation + '"'));
+      }
     });
   });
 });
@@ -149,19 +155,58 @@ router.add('POST', '/applications', function (req, res) {
  * Message publish API endpoint.
  * Publish message to specified channel of specified application.
  *
- * @url POST /messages/[applicationId]
+ * @url POST /messages
  */
-router.add('POST', '/publish/:applicationId', function (req, res) {
-  parse.json(req, res, function (body) {
-    var applicationId = req.param('applicationId');
-    var channelName = body.channelName;
-    var eventName = body.eventName;
-    var message = body.data;
+router.add('POST', '/messages', function (req, res) {
+  parse.json(req, res, function (err, body) {
+    if (err) {
+      return res.badRequest(err.message);
+    }
 
-    pub.publish(applicationId, channelName, eventName, message);
+    var auth = parse.parseAuthorizationHeader(req);
+    var accessKeyId = auth.credential;
 
-    res.json({
-      status: "success"
+    var applicationId = body.applicationId;
+    if (!validation.required(applicationId)) {
+      return res.badRequest('appliationId is required');
+    }
+
+    db.keypair.find(applicationId, accessKeyId, function (err, keypair) {
+      if (err) return res.badRequest(err.message);
+
+      if (!parse.isValidRequest(req, auth, keypair.accessSecretKey, body)) {
+        return res.badRequest('Invalid signature');
+      }
+
+      var channel = body.channel;
+      var event = body.event;
+      var message = body.message;
+
+      if (!validation.required(channel) || !validation.required(event)) {
+        return res.badRequest('channel and event is required');
+      }
+
+      var operation = req.headers['x-tuppari-operation'];
+
+      switch (operation) {
+      case 'PublishMessage':
+        pub.publish(applicationId, channel, event, message, function (err) {
+          if (err) return res.badRequest(err.message);
+
+          res.json({
+            applicationId: applicationId,
+            channel: channel,
+            event: event,
+            message: message,
+            publishedAt: Date.now()
+          });
+        });
+        break;
+
+      default:
+        return res.badRequest(new Error('Invalid operation "' + operation + '"'));
+      }
     });
   });
+
 });

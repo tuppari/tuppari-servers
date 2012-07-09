@@ -87,20 +87,24 @@ util.inherits(Pub, EventEmitter);
 /**
  * Publish data.
  *
- * @param {String} applicatioName The application name to publish
+ * @param {String} applicatioId The application Id
  * @param {String} channelName The channel name to publish
  * @param {String} eventName The event name to publish
  * @param {Object} data Data to publish
  */
-Pub.prototype.publish = function (applicationId, channelName, eventName, data) {
+Pub.prototype.publish = function (applicationId, channelName, eventName, data, callback) {
   if (this.client && this.client.connected) {
     var key = makeKey(applicationId, channelName, eventName);
     var val = data;
-    if (typeof data === 'object') {
+    if (typeof data !== 'string') {
       val = JSON.stringify(data);
     }
     this.emit('log', 'Pub::publish', key, val);
-    this.client.publish(key, val);
+    this.client.publish(key, val, callback);
+  } else {
+    process.nextTick(function () {
+      callback(new Error('Not connected'));
+    });
   }
 };
 
