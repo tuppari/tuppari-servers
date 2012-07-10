@@ -38,7 +38,8 @@
 
     "KeyName": {
       "Description": "Name of an existing EC2 KeyPair to enable SSH access to the application server.",
-      "Type": "String"
+      "Type": "String",
+      "Default": "aws_tuppari"
     },
 
     "GyojiServerPort": {
@@ -66,8 +67,9 @@
     },
 
     "AppRepoURL": {
-      "Description": "Application Git Repository URL",
+      "Description": "Application Zipball/Tarball URL",
       "Type": "String",
+      "Default": "https://github.com/hakobera/tuppari-servers/zipball/master",
       "MinLength": "1",
       "ConstraintDescription": " is required."
     }
@@ -97,7 +99,7 @@
         "instanceStore": "ami-b23374e0"
       },
       "ap-northeast-1": {
-        "ebs": "ami-e47acbe5",
+        "ebs": "ami-5ca5175d",
         "instanceStore": "ami-047bca05"
       },
       "sa-east-1": {
@@ -142,24 +144,32 @@
       "Type": "AWS::CloudFormation::WaitConditionHandle"
     },
 
+    "GyojiServerElasticLoadBalancer" : {
+      "Type" : "AWS::ElasticLoadBalancing::LoadBalancer",
+      "Properties" : {
+        "AvailabilityZones" : [ { "Fn::Join" : [ "", [{ "Ref": "AWS::Region" }, "a"]]} ],
+        "Listeners" : [
+          {
+            "LoadBalancerPort" : "80",
+            "InstancePort" : { "Ref" : "GyojiServerPort" },
+            "Protocol" : "HTTP"
+          }
+        ],
+        "HealthCheck" : {
+          "Target" : { "Fn::Join" : [ "", ["HTTP:", { "Ref" : "GyojiServerPort" }, "/info"]]},
+          "HealthyThreshold" : "3",
+          "UnhealthyThreshold" : "5",
+          "Interval" : "10",
+          "Timeout" : "5"
+        }
+      }
+    },
+
     "GyojiServerLaunchConfig": {
       "Type" : "AWS::AutoScaling::LaunchConfiguration",
       "Metadata": {
         "AWS::CloudFormation::Init": {
           "config": {
-            "packages": {
-              "rpm" : {
-                "nodejs" : "http://nodejs.tchol.org/repocfg/amzn1/nodejs-stable-release.noarch.rpm"
-              },
-              "yum": {
-                "gcc-c++": [],
-                "make": [],
-                "git" : [],
-                "nodejs-compat-symlinks": [],
-                "npm": []
-              }
-            },
-
             "sources" : {
               "/var/opt/tuppari" : { "Ref": "AppRepoURL" }
             }
@@ -197,6 +207,9 @@
                 "cd /var/opt/tuppari/gyoji\n",
                 "npm config set gyoji:PORT ", { "Ref": "GyojiServerPort" } ,"\n",
                 "npm config set gyoji:REDIS_URL ", { "Fn::Join" : [ "", [ "redis://", { "Fn::GetAtt" : [ "RedisServer", "PrivateIp" ]}, ":", { "Ref": "RedisServerPort" }]]}, "\n",
+                "npm config set gyoji:ACCOUNT_TABLE_NAME ", { "Ref": "AccountTable" } ,"\n",
+                "npm config set gyoji:TUPPARI_APPLICATION_DEV ", { "Ref": "ApplicationTable" } ,"\n",
+                "npm config set gyoji:TUPPARI_KEYPAIR_DEV ", { "Ref": "KeypairTable" } ,"\n",
                 "npm install --production\n",
                 "NODE_ENV=production npm start > gyoji.log 2>&1 &\n",
 
@@ -227,27 +240,6 @@
       }
     },
 
-    "GyojiServerElasticLoadBalancer" : {
-      "Type" : "AWS::ElasticLoadBalancing::LoadBalancer",
-      "Properties" : {
-        "AvailabilityZones" : [ { "Fn::Join" : [ "", [{ "Ref": "AWS::Region" }, "a"]]} ],
-        "Listeners" : [
-          {
-            "LoadBalancerPort" : "80",
-            "InstancePort" : { "Ref" : "GyojiServerPort" },
-            "Protocol" : "HTTP"
-          }
-        ],
-        "HealthCheck" : {
-          "Target" : { "Fn::Join" : [ "", ["HTTP:", { "Ref" : "GyojiServerPort" }, "/info"]]},
-          "HealthyThreshold" : "3",
-          "UnhealthyThreshold" : "5",
-          "Interval" : "10",
-          "Timeout" : "5"
-        }
-      }
-    },
-
     "GyojiServerSecurityGroup": {
       "Type": "AWS::EC2::SecurityGroup",
       "Properties": {
@@ -270,24 +262,32 @@
       }
     },
 
+    "HariteServerElasticLoadBalancer" : {
+      "Type" : "AWS::ElasticLoadBalancing::LoadBalancer",
+      "Properties" : {
+        "AvailabilityZones" : [ { "Fn::Join" : [ "", [{ "Ref": "AWS::Region" }, "a"]]} ],
+        "Listeners" : [
+          {
+            "LoadBalancerPort" : "80",
+            "InstancePort" : { "Ref" : "HariteServerPort" },
+            "Protocol" : "TCP"
+          }
+        ],
+        "HealthCheck" : {
+          "Target" : { "Fn::Join" : [ "", ["HTTP:", { "Ref" : "HariteServerPort" }, "/"]]},
+          "HealthyThreshold" : "3",
+          "UnhealthyThreshold" : "5",
+          "Interval" : "10",
+          "Timeout" : "5"
+        }
+      }
+    },
+
     "HariteServerLaunchConfig": {
       "Type" : "AWS::AutoScaling::LaunchConfiguration",
       "Metadata": {
         "AWS::CloudFormation::Init": {
           "config": {
-            "packages": {
-              "rpm" : {
-                "nodejs" : "http://nodejs.tchol.org/repocfg/amzn1/nodejs-stable-release.noarch.rpm"
-              },
-              "yum": {
-                "gcc-c++": [],
-                "make": [],
-                "git" : [],
-                "nodejs-compat-symlinks": [],
-                "npm": []
-              }
-            },
-
             "sources" : {
               "/var/opt/tuppari" : { "Ref": "AppRepoURL" }
             }
@@ -299,6 +299,7 @@
         "InstanceType": { "Ref": "HariteServerInstanceType" },
         "SecurityGroups": [ { "Ref": "HariteServerSecurityGroup" } ],
         "KeyName": { "Ref": "KeyName" },
+        "SpotPrice": "0.1",
         "UserData": {
           "Fn::Base64": {
             "Fn::Base64": {
@@ -362,7 +363,7 @@
         "AdjustmentType" : "ChangeInCapacity",
         "AutoScalingGroupName" : { "Ref" : "HariteServerGroup" },
         "Cooldown" : "60",
-        "ScalingAdjustment" : "1"
+        "ScalingAdjustment" : "2"
       }
     },
 
@@ -373,27 +374,6 @@
         "AutoScalingGroupName" : { "Ref" : "HariteServerGroup" },
         "Cooldown" : "60",
         "ScalingAdjustment" : "-1"
-      }
-    },
-
-    "HariteServerElasticLoadBalancer" : {
-      "Type" : "AWS::ElasticLoadBalancing::LoadBalancer",
-      "Properties" : {
-        "AvailabilityZones" : [ { "Fn::Join" : [ "", [{ "Ref": "AWS::Region" }, "a"]]} ],
-        "Listeners" : [
-          {
-            "LoadBalancerPort" : "80",
-            "InstancePort" : { "Ref" : "HariteServerPort" },
-            "Protocol" : "TCP"
-          }
-        ],
-        "HealthCheck" : {
-          "Target" : { "Fn::Join" : [ "", ["HTTP:", { "Ref" : "HariteServerPort" }, "/"]]},
-          "HealthyThreshold" : "3",
-          "UnhealthyThreshold" : "5",
-          "Interval" : "10",
-          "Timeout" : "5"
-        }
       }
     },
 
@@ -522,7 +502,7 @@
         "Statistic": "Average",
         "Period": "120",
         "EvaluationPeriods": "2",
-        "Threshold": "90",
+        "Threshold": "70",
         "AlarmActions": [ { "Ref": "HariteServerScaleUpPolicy" } ],
         "Dimensions": [
           {
@@ -543,7 +523,7 @@
         "Statistic": "Average",
         "Period": "120",
         "EvaluationPeriods": "2",
-        "Threshold": "60",
+        "Threshold": "30",
         "AlarmActions": [ { "Ref": "HariteServerScaleDownPolicy" } ],
         "Dimensions": [
           {
@@ -553,6 +533,65 @@
         ],
         "ComparisonOperator": "LessThanThreshold"
       }
+    },
+
+    "AccountTable" : {
+      "Type" : "AWS::DynamoDB::Table",
+      "Properties" : {
+        "KeySchema" : {
+          "HashKeyElement": {
+            "AttributeName" : "id",
+            "AttributeType" : "S"
+          }
+        },
+        "ProvisionedThroughput" : {
+          "ReadCapacityUnits" : "5",
+          "WriteCapacityUnits" : "5"
+        }
+      },
+      "DeletionPolicy": "Retain"
+    },
+
+    "ApplicationTable" : {
+      "Type" : "AWS::DynamoDB::Table",
+      "Properties" : {
+        "KeySchema" : {
+          "HashKeyElement": {
+            "AttributeName" : "accountId",
+            "AttributeType" : "S"
+          },
+          "RangeKeyElement" : {
+            "AttributeName" : "name",
+            "AttributeType" : "S"
+          }
+        },
+        "ProvisionedThroughput" : {
+          "ReadCapacityUnits" : "5",
+          "WriteCapacityUnits" : "5"
+        }
+      },
+      "DeletionPolicy": "Retain"
+    },
+
+    "KeypairTable" : {
+      "Type" : "AWS::DynamoDB::Table",
+      "Properties" : {
+        "KeySchema" : {
+          "HashKeyElement": {
+            "AttributeName" : "applicationId",
+            "AttributeType" : "S"
+          },
+          "RangeKeyElement" : {
+            "AttributeName" : "accessKeyId",
+            "AttributeType" : "S"
+          }
+        },
+        "ProvisionedThroughput" : {
+          "ReadCapacityUnits" : "5",
+          "WriteCapacityUnits" : "5"
+        }
+      },
+      "DeletionPolicy": "Retain"
     }
 
   },
@@ -569,6 +608,21 @@
     "RedisURL": {
       "Description": "URL of redis",
       "Value": { "Fn::Join" : [ "", [ "redis://", { "Fn::GetAtt" : [ "RedisServer", "PrivateIp" ]}, ":", { "Ref": "RedisServerPort" }]]}
+    },
+    "AccountTableName" : {
+      "Value" : {"Ref" : "AccountTable"},
+      "Description" : "Dynamo table name of the account"
+    },
+
+    "ApplicationTableName" : {
+      "Value" : {"Ref" : "ApplicationTable"},
+      "Description" : "Dynamo table name of the application"
+    },
+
+    "KeypairTableName" : {
+      "Value" : {"Ref" : "KeypairTable"},
+      "Description" : "Dynamo table name of the keypair"
     }
   }
+
 }
