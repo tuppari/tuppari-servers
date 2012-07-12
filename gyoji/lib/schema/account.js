@@ -91,7 +91,7 @@ Account.prototype.login = function (accountId, password, callback) {
   self.find(accountId, function (err, account) {
     if (err) return callback(err);
 
-    stretch(password, account.salt, function (err, credentials) {
+    passwd.stretch(password, account.salt, function (err, credentials) {
       if (err) return callback(err);
 
       if (account.credentials === credentials) {
