@@ -1,0 +1,85 @@
+{
+  "AWSTemplateFormatVersion": "2010-09-09",
+
+  "Description": "Tuppari DynamoDB CloudFormation Template. **WARNING** This template creates an DynamoDB tabls. You will be billed for the AWS resources used if you create a stack from this template.",
+
+  "Resources": {
+    "Account" : {
+      "Type" : "AWS::DynamoDB::Table",
+      "Properties" : {
+        "KeySchema" : {
+          "HashKeyElement": {
+            "AttributeName" : "id",
+            "AttributeType" : "S"
+          }
+        },
+        "ProvisionedThroughput" : {
+          "ReadCapacityUnits" : "5",
+          "WriteCapacityUnits" : "5"
+        }
+      },
+      "DeletionPolicy": "Retain"
+    },
+
+    "Application" : {
+      "Type" : "AWS::DynamoDB::Table",
+      "Properties" : {
+        "KeySchema" : {
+          "HashKeyElement": {
+            "AttributeName" : "accountId",
+            "AttributeType" : "S"
+          },
+          "RangeKeyElement" : {
+            "AttributeName" : "name",
+            "AttributeType" : "S"
+          }
+        },
+        "ProvisionedThroughput" : {
+          "ReadCapacityUnits" : "5",
+          "WriteCapacityUnits" : "5"
+        }
+      },
+      "DeletionPolicy": "Retain"
+    },
+
+    "Keypair" : {
+      "Type" : "AWS::DynamoDB::Table",
+      "Properties" : {
+        "KeySchema" : {
+          "HashKeyElement": {
+            "AttributeName" : "applicationId",
+            "AttributeType" : "S"
+          },
+          "RangeKeyElement" : {
+            "AttributeName" : "accessKeyId",
+            "AttributeType" : "S"
+          }
+        },
+        "ProvisionedThroughput" : {
+          "ReadCapacityUnits" : "5",
+          "WriteCapacityUnits" : "5"
+        }
+      },
+      "DeletionPolicy": "Retain"
+    }
+
+  },
+
+  "Outputs": {
+    "AccountTableName" : {
+      "Value" : {"Ref" : "Account"},
+      "Description" : "Dynamo table name of the account"
+    },
+
+    "ApplicationTableName" : {
+      "Value" : {"Ref" : "Application"},
+      "Description" : "Dynamo table name of the application"
+    },
+
+    "KeypairTableName" : {
+      "Value" : {"Ref" : "Keypair"},
+      "Description" : "Dynamo table name of the keypair"
+    }
+  }
+
+}
