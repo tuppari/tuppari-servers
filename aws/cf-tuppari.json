@@ -99,7 +99,7 @@
         "instanceStore": "ami-b23374e0"
       },
       "ap-northeast-1": {
-        "ebs": "ami-5ca5175d",
+        "ebs": "ami-10932111",
         "instanceStore": "ami-047bca05"
       },
       "sa-east-1": {
@@ -208,8 +208,8 @@
                 "npm config set gyoji:PORT ", { "Ref": "GyojiServerPort" } ,"\n",
                 "npm config set gyoji:REDIS_URL ", { "Fn::Join" : [ "", [ "redis://", { "Fn::GetAtt" : [ "RedisServer", "PrivateIp" ]}, ":", { "Ref": "RedisServerPort" }]]}, "\n",
                 "npm config set gyoji:ACCOUNT_TABLE_NAME ", { "Ref": "AccountTable" } ,"\n",
-                "npm config set gyoji:TUPPARI_APPLICATION_DEV ", { "Ref": "ApplicationTable" } ,"\n",
-                "npm config set gyoji:TUPPARI_KEYPAIR_DEV ", { "Ref": "KeypairTable" } ,"\n",
+                "npm config set gyoji:APPLICATION_TABLE_NAME ", { "Ref": "ApplicationTable" } ,"\n",
+                "npm config set gyoji:KEYPAIR_TABLE_NAME ", { "Ref": "KeypairTable" } ,"\n",
                 "npm install --production\n",
                 "NODE_ENV=production npm start > gyoji.log 2>&1 &\n",
 
