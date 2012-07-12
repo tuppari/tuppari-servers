@@ -1,6 +1,7 @@
 var
   http = require('http'),
   util = require('util'),
+  url = require('url'),
   env = require('../../common/lib/env');
 
 exports.Manager = require('./manager');
@@ -36,13 +37,19 @@ exports.listen = function (port, options, callback) {
   }
 
   server.on('request', function (req, res) {
-    res.writeHead(200, {
-      'Content-Type': 'text/plain',
-      'Access-Control-Allow-Origin': '*',
-      'Access-Control-Expose-Headers': 'X-Harite-Endpoint',
-      'X-Harite-Endpoint': wsUrl
-    });
-    res.end('Welcome to tuppari push server.');
+    var uri = url.parse(req.url);
+    if (uri.pathname === '/endpoint') {
+      res.writeHead(200, {
+        'Content-Type': 'text/plain',
+        'Access-Control-Allow-Origin': '*'
+      });
+      res.end(wsUrl);
+    } else {
+      res.writeHead(200, {
+        'Content-Type': 'text/plain'
+      });
+      res.end('Welcome to tuppari push server.');
+    }
   });
 
   server.listen(port, function () {
