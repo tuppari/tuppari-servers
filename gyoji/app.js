@@ -14,7 +14,7 @@ var debug = function() {
 
 process.on('uncaughtException', function (err) {
   console.error('uncaughtException: %s', util.inspect(err, true));
-  process.exit(1);
+  // ignore
 });
 
 var app = http.createServer(function (req, res) {
