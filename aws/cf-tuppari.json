@@ -66,14 +66,6 @@
       "ConstraintDescription": "must be number and greater than well-known port number (> 1024)."
     },
 
-    "AppRepoURL": {
-      "Description": "Application Zipball/Tarball URL",
-      "Type": "String",
-      "Default": "https://github.com/hakobera/tuppari-servers/zipball/master",
-      "MinLength": "1",
-      "ConstraintDescription": " is required."
-    },
-
     "AccountTable": {
       "Description": "Account table name of DynamoDB",
       "Type": "String",
@@ -91,6 +83,14 @@
     "KeypairTable": {
       "Description": "Keypair table name of DynamoDB",
       "Type": "String",
+      "MinLength": "1",
+      "ConstraintDescription": " is required."
+    },
+
+    "AppVersion": {
+      "Description": "Application version",
+      "Type": "String",
+      "Default": "v0.1.0",
       "MinLength": "1",
       "ConstraintDescription": " is required."
     }
@@ -184,10 +184,10 @@
         ],
         "HealthCheck" : {
           "Target" : { "Fn::Join" : [ "", ["HTTP:", { "Ref" : "GyojiServerPort" }, "/info"]]},
-          "HealthyThreshold" : "3",
-          "UnhealthyThreshold" : "5",
-          "Interval" : "10",
-          "Timeout" : "5"
+          "HealthyThreshold" : "2",
+          "UnhealthyThreshold" : "3",
+          "Interval" : "15",
+          "Timeout" : "10"
         }
       }
     },
@@ -198,7 +198,7 @@
         "AWS::CloudFormation::Init": {
           "config": {
             "sources" : {
-              "/var/opt/tuppari" : { "Ref": "AppRepoURL" }
+              "/var/opt/tuppari" : "https://github.com/hakobera/tuppari-servers/zipball/v0.1.0"
             }
           }
         }
@@ -263,7 +263,7 @@
         "Tags" : [
           {
             "Key" : "Name",
-            "Value" : { "Fn::Join" : [ "", [ { "Ref": "AWS::StackName" }, "::GyojiServer" ]] },
+            "Value" : { "Fn::Join" : [ "", [ { "Ref": "AWS::StackName" }, "::GyojiServer::", { "Ref": "AppVersion" } ]] },
             "PropagateAtLaunch" : "true"
           }
         ]
@@ -305,10 +305,10 @@
         ],
         "HealthCheck" : {
           "Target" : { "Fn::Join" : [ "", ["HTTP:", { "Ref" : "HariteServerPort" }, "/"]]},
-          "HealthyThreshold" : "3",
-          "UnhealthyThreshold" : "5",
-          "Interval" : "10",
-          "Timeout" : "5"
+          "HealthyThreshold" : "2",
+          "UnhealthyThreshold" : "3",
+          "Interval" : "15",
+          "Timeout" : "10"
         }
       }
     },
@@ -319,7 +319,7 @@
         "AWS::CloudFormation::Init": {
           "config": {
             "sources" : {
-              "/var/opt/tuppari" : { "Ref": "AppRepoURL" }
+              "/var/opt/tuppari" : "https://github.com/hakobera/tuppari-servers/zipball/v0.1.0"
             }
           }
         }
@@ -380,7 +380,7 @@
         "Tags" : [
           {
             "Key" : "Name",
-            "Value" : { "Fn::Join" : [ "", [ { "Ref": "AWS::StackName" }, "::HariteServer" ]] },
+            "Value" : { "Fn::Join" : [ "", [ { "Ref": "AWS::StackName" }, "::HariteServer::", { "Ref": "AppVersion" } ]] },
             "PropagateAtLaunch" : "true"
           }
         ]
