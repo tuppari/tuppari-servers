@@ -72,8 +72,11 @@ Application.prototype.find = function (ownerAccountId, applicationName, callback
  * @param {String} ownerAccountId Application owner account ID
  * @param {Function(err, applications)} callback
  */
-Application.prototype.list = function (ownerAccountId, callback) {
-  this.table.query({
-    accountId: accountId
-  }).fetch(callback);
+Application.prototype.list = function (accountId, callback) {
+  this
+    .table
+    .query({
+      accountId: accountId
+    })
+    .fetch(callback);
 };

@@ -13,7 +13,7 @@ var debug = function() {
 };
 
 process.on('uncaughtException', function (err) {
-  console.error('uncaughtException: %s', util.inspect(err, true));
+  console.error('uncaughtException: %s', util.inspect(err, true, null));
   // ignore
 });
 

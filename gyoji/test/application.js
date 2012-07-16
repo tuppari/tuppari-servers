@@ -2,7 +2,8 @@ var db = require('../lib/db');
 
 var should = require('should'),
   uuid = require('node-uuid'),
-  util = require('util');
+  util = require('util'),
+  async = require('async');
 
 describe('db.application', function () {
 
@@ -47,6 +48,48 @@ describe('db.application', function () {
           done();
         });
       });
+    })
+  })
+
+  describe('list()', function () {
+    it('should returns application list owned by specified account', function (done) {
+      var accountId = uuid.v1();
+
+      async.series([
+        function (callback) {
+          db.application.create(accountId, 'test1', callback);
+        },
+        function (callback) {
+          db.application.create(accountId, 'test2', callback);
+        },
+        function (callback) {
+          db.application.list(accountId, callback);
+        }
+      ],
+      function (err, results) {
+        if (err) return done(err);
+
+        var apps = results[2];
+        apps.should.have.lengthOf(2);
+
+        apps[0].accountId.should.eql(accountId);
+        apps[0].name.should.eql('test1');
+        should.exist(apps[0].applicationId);
+
+        apps[1].accountId.should.eql(accountId);
+        apps[1].name.should.eql('test2');
+        should.exist(apps[1].applicationId);
+
+        done();
+      });
+    })
+
+    it('should returns empty array when specified account has no application', function (done) {
+      var accountId = uuid.v1();
+      db.application.list(accountId, function (err, apps) {
+        apps.should.be.empty;
+        done();
+      })
     })
   })
 

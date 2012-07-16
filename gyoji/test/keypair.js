@@ -1,7 +1,8 @@
 var db = require('../lib/db');
 
 var should = require('should'),
-  uuid = require('node-uuid');
+  uuid = require('node-uuid'),
+  async = require('async');
 
 describe('db.keypair', function () {
 
@@ -45,6 +46,55 @@ describe('db.keypair', function () {
           done();
         });
       });
+    })
+  })
+
+  describe('findByApplicationIds()', function () {
+    it('should returns keypairs that have applicationId included in specified list', function (done) {
+      var appIds = [ uuid.v1(), uuid.v1() ];
+
+      async.series([
+        function (callback) {
+          db.keypair.create(appIds[0], callback);
+        },
+        function (callback) {
+          db.keypair.create(appIds[1], callback);
+        },
+        function (callback) {
+          db.keypair.findByApplicationIds(appIds, callback);
+        }
+      ],
+      function (err, results) {
+        if (err) return done(err);
+
+        var apps = results[2];
+        apps.should.have.lengthOf(2);
+
+        apps.forEach(function (app) {
+          switch (app.applicationId) {
+          case appIds[0]:
+          case appIds[1]:
+            should.exist(app.accessKeyId);
+            should.exist(app.accessSecretKey);
+            break;
+
+          default:
+            return done(new Error('Invalid applicationId: ' + app.applicationId));
+          }
+        });
+
+        done();
+      });
+    })
+
+    it('should returns empty array when argument is empty array', function (done) {
+      db.keypair.findByApplicationIds([], function (err, keypairs) {
+        if (err) return done(err);
+
+        console.log(keypairs);
+        keypairs.should.be.empty
+        done();
+      })
     })
   })
 

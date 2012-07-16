@@ -53,3 +53,26 @@ Keypair.prototype.find = function (applicationId, accessKeyId, callback) {
   };
   return this.findByKey(key, callback);
 };
+
+/**
+ * Find keypair by applicationId array.
+ *
+ * @param {String} applicationIds The owner application ID array of the keypair
+ * @param {Function(err, Array(keypair))}callback
+ */
+Keypair.prototype.findByApplicationIds = function (applicationIds, callback) {
+  if (!applicationIds || applicationIds.length === 0) {
+    process.nextTick(function () {
+      callback(null, []);
+    });
+  }
+
+  var pred = {
+    applicationId: { 'in': applicationIds }
+  };
+
+  this
+    .table
+    .scan(pred)
+    .fetch(callback);
+};

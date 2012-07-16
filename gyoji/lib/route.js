@@ -144,6 +144,46 @@ router.add('POST', '/applications', function (req, res) {
         });
         break;
 
+      case 'ListApplication':
+        db.application.list(account.id, function (err, applications) {
+          if (err) return res.badRequest(err);
+
+          var appIds = [],
+              apps = {},
+              keys = {};
+
+          if (!applications || applications.length === 0) {
+            return res.json({});
+          }
+
+          applications.forEach(function (app) {
+            appIds.push(app.applicationId);
+          });
+
+          db.keypair.findByApplicationIds(appIds, function (err, keypairs) {
+            if (err) return res.badRequest(err);
+
+            keypairs.forEach(function (keypair) {
+              keys[keypair.applicationId] = {
+                accessKeyId: keypair.accessKeyId,
+                accessSecretKey: keypair.accessSecretKey
+              };
+            });
+
+            applications.forEach(function (app) {
+              apps[app.name] = {
+                name: app.name,
+                applicationId: app.applicationId,
+                accessKeyId: keys[app.applicationId].accessKeyId,
+                accessSecretKey: keys[app.applicationId].accessSecretKey
+              };
+            });
+
+            res.json(apps);
+          });
+        });
+        break;
+
       default:
         return res.badRequest(new Error('Invalid operation "' + operation + '"'));
       }
