@@ -39,7 +39,6 @@
     "KeyName": {
       "Description": "Name of an existing EC2 KeyPair to enable SSH access to the application server.",
       "Type": "String",
-      "Default": "aws_tuppari"
     },
 
     "GyojiServerPort": {
@@ -121,7 +120,7 @@
         "instanceStore": "ami-b23374e0"
       },
       "ap-northeast-1": {
-        "ebs": "ami-10932111",
+        "ebs": "ami-e47acbe5",
         "instanceStore": "ami-047bca05"
       },
       "sa-east-1": {
@@ -197,6 +196,19 @@
       "Metadata": {
         "AWS::CloudFormation::Init": {
           "config": {
+            "packages": {
+              "rpm" : {
+                "nodejs" : "http://nodejs.tchol.org/repocfg/amzn1/nodejs-stable-release.noarch.rpm"
+              },
+              "yum": {
+                "gcc-c++": [],
+                "make": [],
+                "git" : [],
+                "nodejs-compat-symlinks": [],
+                "npm": []
+              }
+            },
+
             "sources" : {
               "/var/opt/tuppari" : "https://github.com/hakobera/tuppari-servers/zipball/v0.1.0"
             }
@@ -318,6 +330,19 @@
       "Metadata": {
         "AWS::CloudFormation::Init": {
           "config": {
+            "packages": {
+              "rpm" : {
+                "nodejs" : "http://nodejs.tchol.org/repocfg/amzn1/nodejs-stable-release.noarch.rpm"
+              },
+              "yum": {
+                "gcc-c++": [],
+                "make": [],
+                "git" : [],
+                "nodejs-compat-symlinks": [],
+                "npm": []
+              }
+            },
+
             "sources" : {
               "/var/opt/tuppari" : "https://github.com/hakobera/tuppari-servers/zipball/v0.1.0"
             }
