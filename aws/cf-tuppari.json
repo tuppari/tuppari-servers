@@ -239,6 +239,7 @@
                 "npm config set gyoji:KEYPAIR_TABLE_NAME ", { "Ref": "KeypairTable" } ,"\n",
                 "npm config set gyoji:AWS_ACCESS_KEY_ID ",  { "Ref": "HostKeys" } ,"\n",
                 "npm config set gyoji:AWS_SECRET_ACCESS_KEY ", { "Fn::GetAtt": ["HostKeys", "SecretAccessKey"] } ,"\n",
+                "npm config set gyoji:AWS_REGION ", { "Ref": "AWS::Region" } ,"\n",
                 "npm install --production\n",
                 "NODE_ENV=production npm start > gyoji.log 2>&1 &\n",
 
