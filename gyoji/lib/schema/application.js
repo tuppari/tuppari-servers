@@ -39,7 +39,7 @@ Application.prototype.create = function (ownerAccountId, applicationName, callba
     var application = {
       accountId: ownerAccountId,
       name: applicationName,
-      applicationId: uuid.v1(),
+      applicationId: uuid.v4(),
       createdAt: now,
       updatedAt: now
     };

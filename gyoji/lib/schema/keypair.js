@@ -27,8 +27,8 @@ Keypair.prototype.create = function (applicationId, callback) {
 
   var keypair = {
     applicationId: applicationId,
-    accessKeyId: uuid.v1(),
-    accessSecretKey: uuid.v1(),
+    accessKeyId: uuid.v4(),
+    accessSecretKey: uuid.v4(),
     createdAt: now,
     updatedAt: now
   };
