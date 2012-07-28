@@ -214,6 +214,8 @@ router.add('POST', '/messages', function (req, res) {
     db.keypair.find(applicationId, accessKeyId, function (err, keypair) {
       if (err) return res.badRequest(err.message);
 
+      if (!keypair) return res.badRequest('Invalid keys');
+
       if (!parse.isValidRequest(req, auth, keypair.accessSecretKey, body)) {
         return res.badRequest('Invalid signature');
       }
