@@ -1,5 +1,4 @@
 var Router = require('router-line').Router,
-  redis = require('redis'),
   uuid = require('node-uuid'),
   parse = require('./parse'),
   db = require('./db'),
