@@ -22,6 +22,7 @@ var Manager = module.exports = function (server, options, callback) {
   wss.on('connection', function (client) {
     var socket = new Socket(self, client);
     self.sockets[socket.id] = socket;
+    self.emit('log', 'Manager:connection', socket.id);
     self.emit('connection', socket);
   });
 
@@ -44,14 +45,11 @@ util.inherits(Manager, EventEmitter);
  * @param {Socket} socket Disconnected socket
  */
 Manager.prototype.disconnect = function (socket) {
-  var self = this;
-  var keys = Object.keys(self.rooms);
-
-  for (var i = 0, l = keys.length; i < l; i++) {
-    self.removeFromRoom(keys[i], socket);
+  var keys = Object.keys(this.rooms);
+  for (var i = 0, iz = keys.length; i < iz; i++) {
+    this.removeFromRoom(keys[i], socket);
   }
-
-  delete self.sockets[socket.id];
+  delete this.sockets[socket.id];
 };
 
 /**
