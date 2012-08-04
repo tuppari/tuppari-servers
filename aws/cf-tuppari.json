@@ -20,14 +20,6 @@
       "ConstraintDescription": "must be a valid EC2 instance type."
     },
 
-    "RedisServerInstanceType": {
-      "Description": "Redis server instance type",
-      "Type": "String",
-      "Default": "m1.small",
-      "AllowedValues": ["t1.micro", "m1.small", "m1.medium", "m1.large", "m1.xlarge", "m2.xlarge", "m2.2xlarge", "m2.4xlarge", "c1.medium", "c1.xlarge"],
-      "ConstraintDescription": "must be a valid EC2 instance type."
-    },
-
     "RootDeviceType": {
       "Description": "EC2 root device type ('ebs' or 'instanceStore')",
       "Type": "String",
@@ -45,23 +37,15 @@
       "Description": "TCP/IP port of the administration server.",
       "Type": "Number",
       "Default": 3000,
-      "MinValue": 1025,
+      "MinValue": 300,
       "ConstraintDescription": "must be number and greater than well-known port number (> 1024)."
     },
 
     "HariteServerPort": {
       "Description": "TCP/IP port of the broadcast server.",
       "Type": "Number",
-      "Default": 3000,
-      "MinValue": 1025,
-      "ConstraintDescription": "must be number and greater than well-known port number (> 1024)."
-    },
-
-    "RedisServerPort": {
-      "Description": "TCP/IP port of the redis server.",
-      "Type": "Number",
-      "Default": 6379,
-      "MinValue": 1025,
+      "Default": 80,
+      "MinValue": 80,
       "ConstraintDescription": "must be number and greater than well-known port number (> 1024)."
     },
 
@@ -86,10 +70,16 @@
       "ConstraintDescription": " is required."
     },
 
-    "AppVersion": {
-      "Description": "Application version",
+    "AppURL": {
+      "Description": "Application zip/tarball URL",
       "Type": "String",
-      "Default": "v0.1.0",
+      "ConstraintDescription": " is required."
+    },
+
+    "AvailabilityZone": {
+      "Description": "Availability Zone ID",
+      "Type": "String",
+      "Default": "a",
       "MinLength": "1",
       "ConstraintDescription": " is required."
     }
@@ -166,6 +156,34 @@
       }
     },
 
+    "SNSTopic": {
+      "Type": "AWS::SNS::Topic"
+    },
+
+    "SNSPolicy" : {
+      "Type" : "AWS::SNS::TopicPolicy",
+      "Properties" : {
+        "PolicyDocument" :  {
+          "Version" : "2008-10-17",
+            "Id" : "SNSTopicPolicy",
+            "Statement" : [{
+              "Sid" : "SNS-statement-id",
+              "Effect" : "Allow",
+              "Principal" : {
+                "AWS" : { "Fn::GetAtt" : [ "CfnUser", "Arn" ] }
+              },
+              "Action" : [
+                "sns:Publish",
+                "sns:Subscribe",
+                "sns:Receive"
+              ],
+              "Resource" : "*"
+           }]
+        },
+        "Topics" : [ { "Ref" : "SNSTopic" } ]
+      }
+    },
+
     "WaitHandle": {
       "Type": "AWS::CloudFormation::WaitConditionHandle"
     },
@@ -173,7 +191,7 @@
     "GyojiServerElasticLoadBalancer" : {
       "Type" : "AWS::ElasticLoadBalancing::LoadBalancer",
       "Properties" : {
-        "AvailabilityZones" : [ { "Fn::Join" : [ "", [{ "Ref": "AWS::Region" }, "a"]]} ],
+        "AvailabilityZones" : [ { "Fn::Join" : [ "", [ { "Ref": "AWS::Region" }, { "Ref": "AvailabilityZone" } ]]} ],
         "Listeners" : [
           {
             "LoadBalancerPort" : "80",
@@ -203,14 +221,14 @@
               "yum": {
                 "gcc-c++": [],
                 "make": [],
-                "git" : [],
                 "nodejs-compat-symlinks": [],
-                "npm": []
+                "npm": [],
+                "libxml2-devel": []
               }
             },
 
             "sources" : {
-              "/var/opt/tuppari" : "https://github.com/hakobera/tuppari-servers/zipball/v0.1.0"
+              "/var/opt/tuppari" : { "Ref": "AppURL" }
             }
           }
         }
@@ -245,14 +263,16 @@
                 "# Start application\n",
                 "cd /var/opt/tuppari/gyoji\n",
                 "npm config set gyoji:PORT ", { "Ref": "GyojiServerPort" } ,"\n",
-                "npm config set gyoji:REDIS_URL ", { "Fn::Join" : [ "", [ "redis://", { "Fn::GetAtt" : [ "RedisServer", "PrivateIp" ]}, ":", { "Ref": "RedisServerPort" }]]}, "\n",
                 "npm config set gyoji:ACCOUNT_TABLE_NAME ", { "Ref": "AccountTable" } ,"\n",
                 "npm config set gyoji:APPLICATION_TABLE_NAME ", { "Ref": "ApplicationTable" } ,"\n",
                 "npm config set gyoji:KEYPAIR_TABLE_NAME ", { "Ref": "KeypairTable" } ,"\n",
                 "npm config set gyoji:AWS_ACCESS_KEY_ID ",  { "Ref": "HostKeys" } ,"\n",
                 "npm config set gyoji:AWS_SECRET_ACCESS_KEY ", { "Fn::GetAtt": ["HostKeys", "SecretAccessKey"] } ,"\n",
                 "npm config set gyoji:AWS_REGION ", { "Ref": "AWS::Region" } ,"\n",
+                "npm config set gyoji:SNS_TOPIC_ARN ", { "Ref" : "SNSTopic" }, "\n",
                 "npm install --production\n",
+                "cp /tmp/.npmrc /root\n",
+
                 "NODE_ENV=production npm start > gyoji.log 2>&1 &\n",
 
                 "# All is well so signal success\n",
@@ -267,15 +287,15 @@
     "GyojiServerGroup" : {
       "Type" : "AWS::AutoScaling::AutoScalingGroup",
       "Properties" : {
-        "AvailabilityZones" : [ { "Fn::Join" : [ "", [{ "Ref": "AWS::Region" }, "a"]]} ],
+        "AvailabilityZones" : [ { "Fn::Join" : [ "", [ { "Ref": "AWS::Region" }, { "Ref": "AvailabilityZone" } ]]} ],
         "LaunchConfigurationName" : { "Ref" : "GyojiServerLaunchConfig" },
-        "MinSize" : "1",
-        "MaxSize" : "1",
+        "MinSize" : "2",
+        "MaxSize" : "4",
         "LoadBalancerNames" : [ { "Ref" : "GyojiServerElasticLoadBalancer" } ],
         "Tags" : [
           {
             "Key" : "Name",
-            "Value" : { "Fn::Join" : [ "", [ { "Ref": "AWS::StackName" }, "::GyojiServer::", { "Ref": "AppVersion" } ]] },
+            "Value" : { "Fn::Join" : [ "", [ { "Ref": "AWS::StackName" }, "::GyojiServer::", { "Ref": "AppURL" } ]] },
             "PropagateAtLaunch" : "true"
           }
         ]
@@ -307,7 +327,7 @@
     "HariteServerElasticLoadBalancer" : {
       "Type" : "AWS::ElasticLoadBalancing::LoadBalancer",
       "Properties" : {
-        "AvailabilityZones" : [ { "Fn::Join" : [ "", [{ "Ref": "AWS::Region" }, "a"]]} ],
+        "AvailabilityZones" : [ { "Fn::Join" : [ "", [ { "Ref": "AWS::Region" }, { "Ref": "AvailabilityZone" } ]]} ],
         "Listeners" : [
           {
             "LoadBalancerPort" : "80",
@@ -337,14 +357,14 @@
               "yum": {
                 "gcc-c++": [],
                 "make": [],
-                "git" : [],
                 "nodejs-compat-symlinks": [],
-                "npm": []
+                "npm": [],
+                "libxml2-devel": []
               }
             },
 
             "sources" : {
-              "/var/opt/tuppari" : "https://github.com/hakobera/tuppari-servers/zipball/v0.1.0"
+              "/var/opt/tuppari": { "Ref": "AppURL" }
             }
           }
         }
@@ -381,8 +401,13 @@
                 "cd /var/opt/tuppari/harite\n",
                 "npm config set harite:HOST_NAME `curl http://169.254.169.254/latest/meta-data/public-hostname`", "\n",
                 "npm config set harite:PORT ", { "Ref": "HariteServerPort" }, "\n",
-                "npm config set harite:REDIS_URL ", { "Fn::Join" : [ "", [ "redis://", { "Fn::GetAtt" : [ "RedisServer", "PrivateIp" ]}, ":", { "Ref": "RedisServerPort" }]]}, "\n",
+                "npm config set harite:AWS_ACCESS_KEY_ID ",  { "Ref": "HostKeys" } ,"\n",
+                "npm config set harite:AWS_SECRET_ACCESS_KEY ", { "Fn::GetAtt": ["HostKeys", "SecretAccessKey"] } ,"\n",
+                "npm config set harite:AWS_REGION ", { "Ref": "AWS::Region" } ,"\n",
+                "npm config set harite:SNS_TOPIC_ARN ", { "Ref" : "SNSTopic" }, "\n",
                 "npm install --production\n",
+                "cp /tmp/.npmrc /root\n",
+
                 "NODE_ENV=production npm start > harite.log 2>&1 &\n",
 
                 "# All is well so signal success\n",
@@ -397,15 +422,15 @@
     "HariteServerGroup" : {
       "Type" : "AWS::AutoScaling::AutoScalingGroup",
       "Properties" : {
-        "AvailabilityZones" : [ { "Fn::Join" : [ "", [{ "Ref": "AWS::Region" }, "a"]]} ],
+        "AvailabilityZones" : [ { "Fn::Join" : [ "", [ { "Ref": "AWS::Region" }, { "Ref": "AvailabilityZone" } ]]} ],
         "LaunchConfigurationName" : { "Ref" : "HariteServerLaunchConfig" },
-        "MinSize" : "1",
-        "MaxSize" : "10",
+        "MinSize" : "2",
+        "MaxSize" : "16",
         "LoadBalancerNames" : [ { "Ref" : "HariteServerElasticLoadBalancer" } ],
         "Tags" : [
           {
             "Key" : "Name",
-            "Value" : { "Fn::Join" : [ "", [ { "Ref": "AWS::StackName" }, "::HariteServer::", { "Ref": "AppVersion" } ]] },
+            "Value" : { "Fn::Join" : [ "", [ { "Ref": "AWS::StackName" }, "::HariteServer::", { "Ref": "AppURL" } ]] },
             "PropagateAtLaunch" : "true"
           }
         ]
@@ -448,101 +473,6 @@
             "FromPort": { "Ref": "HariteServerPort" },
             "ToPort": { "Ref": "HariteServerPort" },
             "CidrIp": "0.0.0.0/0"
-          }
-        ]
-      }
-    },
-
-    "RedisServer": {
-      "Type": "AWS::EC2::Instance",
-      "Metadata": {
-        "AWS::CloudFormation::Init": {
-          "config": {
-            "packages": {
-              "rpm" : {
-                "epel" : "http://ftp.jaist.ac.jp/pub/Linux/Fedora/epel/6/i386/epel-release-6-7.noarch.rpm"
-              },
-              "yum": {
-                "redis" : []
-              }
-            },
-
-            "services" : {
-              "sysvinit" : {
-                "redis" : {
-                  "enabled" : "true",
-                  "ensureRunning" : "false"
-                }
-              }
-            }
-          }
-        }
-      },
-
-      "Properties": {
-        "ImageId": { "Fn::FindInMap": [ "AWSRegionArch2AMI", { "Ref": "AWS::Region" }, "ebs" ] },
-        "InstanceType": { "Ref": "RedisServerInstanceType" },
-        "SecurityGroups": [ { "Ref": "RedisServerSecurityGroup" } ],
-        "AvailabilityZone" : { "Fn::Join" : [ "", [{ "Ref": "AWS::Region" }, "a"]]},
-        "KeyName": { "Ref": "KeyName" },
-        "Tags" : [
-          {
-            "Key" : "Name",
-            "Value" : { "Fn::Join" : [ "", [ { "Ref": "AWS::StackName" }, "::RedisServer" ]] }
-          }
-        ],
-        "UserData": {
-          "Fn::Base64": {
-            "Fn::Join": ["", [
-              "#!/bin/bash -v\n",
-              "yum update -y aws-cfn-bootstrap\n",
-
-              "# Helper function\n",
-              "function error_exit\n",
-              "{\n",
-              "  /opt/aws/bin/cfn-signal -e 1 -r \"$1\" '", { "Ref": "WaitHandle" }, "'\n",
-              "  exit 1\n",
-              "}\n",
-
-              "# Install packages\n",
-              "/opt/aws/bin/cfn-init -s ", { "Ref": "AWS::StackName" }, " -r RedisServer ",
-              "    --access-key ", { "Ref": "HostKeys" },
-              "    --secret-key ", { "Fn::GetAtt": ["HostKeys", "SecretAccessKey"] },
-              "    --region ", { "Ref": "AWS::Region" }, " || error_exit 'Failed to run cfn-init'\n",
-
-              "sed -i -e 's/bind 127.0.0.1/#bind 127.0.0.1/' /etc/redis.conf\n",
-              "service redis restart\n",
-
-              "# All is well so signal success\n",
-              "/opt/aws/bin/cfn-signal -e 0 -r \"HariteServer setup complete\" '", { "Ref": "WaitHandle" }, "'\n"
-            ]]
-          }
-        }
-      }
-    },
-
-    "RedisServerSecurityGroup": {
-      "Type": "AWS::EC2::SecurityGroup",
-      "Properties": {
-        "GroupDescription": "Enable Redis access",
-        "SecurityGroupIngress": [
-          {
-            "IpProtocol": "tcp",
-            "FromPort": 22,
-            "ToPort": 22,
-            "CidrIp": "0.0.0.0/0"
-          },
-          {
-            "IpProtocol": "tcp",
-            "FromPort": { "Ref": "RedisServerPort" },
-            "ToPort": { "Ref": "RedisServerPort" },
-            "SourceSecurityGroupName" : { "Ref" : "GyojiServerSecurityGroup" }
-          },
-          {
-            "IpProtocol": "tcp",
-            "FromPort": { "Ref": "RedisServerPort" },
-            "ToPort": { "Ref": "RedisServerPort" },
-            "SourceSecurityGroupName" : { "Ref" : "HariteServerSecurityGroup" }
           }
         ]
       }
@@ -593,17 +523,21 @@
   },
 
   "Outputs": {
-    "GyojiServerURL" : {
-      "Description" : "URL of the admin app.",
-      "Value" :  { "Fn::Join" : [ "", [ "http://", { "Fn::GetAtt" : [ "GyojiServerElasticLoadBalancer", "DNSName" ]}]]}
+    "GyojiServerURL": {
+      "Description": "URL of the admin app.",
+      "Value": { "Fn::Join" : [ "", [ "http://", { "Fn::GetAtt" : [ "GyojiServerElasticLoadBalancer", "DNSName" ]}]]}
     },
-    "HariteServerURL" : {
-      "Description" : "URL of the broadcast app",
-      "Value" :  { "Fn::Join" : [ "", [ "http://", { "Fn::GetAtt" : [ "HariteServerElasticLoadBalancer", "DNSName" ]}]]}
+    "HariteServerURL": {
+      "Description": "URL of the broadcast app",
+      "Value": { "Fn::Join" : [ "", [ "http://", { "Fn::GetAtt" : [ "HariteServerElasticLoadBalancer", "DNSName" ]}]]}
     },
-    "RedisURL": {
-      "Description": "URL of redis",
-      "Value": { "Fn::Join" : [ "", [ "redis://", { "Fn::GetAtt" : [ "RedisServer", "PrivateIp" ]}, ":", { "Ref": "RedisServerPort" }]]}
+    "AppURL": {
+      "Description": "URL of the application zip/tarball",
+      "Value": { "Ref": "AppURL" }
+    },
+    "SNSTopic": {
+      "Description": "SNS Topic ARN",
+      "Value": { "Ref" : "SNSTopic" }
     }
   }
 
