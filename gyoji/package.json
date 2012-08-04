@@ -11,7 +11,8 @@
     "redis": "0.7.2",
     "dynamo": "0.2.13",
     "async": "0.1.22",
-    "debug": "0.7.0"
+    "debug": "0.7.0",
+    "aws2js": "~0.7.0"
   },
   "devDependencies": {
     "mocha": "*",
@@ -33,7 +34,8 @@
     "REDIS_URL": "redis://localhost",
     "ACCOUNT_TABLE_NAME": "TUPPARI_ACCOUNT_DEV",
     "APPLICATION_TABLE_NAME": "TUPPARI_APPLICATION_DEV",
-    "KEYPAIR_TABLE_NAME": "TUPPARI_KEYPAIR_DEV"
+    "KEYPAIR_TABLE_NAME": "TUPPARI_KEYPAIR_DEV",
+    "SNS_TOPIC_ARN": "arn:aws:sns:ap-northeast-1:505212892390:sns_test"
   },
   "engines": {
     "node": ">= 0.6.13"

@@ -12,9 +12,15 @@ var debug = function() {
   }
 };
 
+function eventLogger(eventType) {
+  var args = Array.prototype.slice.call(arguments, 1);
+  var d = new Date();
+  var dateString = util.format('%s-%d-%sT%s:%s:%s.%s', d.getFullYear(), d.getMonth() + 1, d.getDate(), d.getHours(), d.getMinutes(), d.getSeconds(), d.getMilliseconds());
+  console.log(dateString, eventType, args);
+}
+
 process.on('uncaughtException', function (err) {
-  console.error('uncaughtException: %s', util.inspect(err, true, null));
-  // ignore
+  eventLogger('uncaughtException', err.stack);
 });
 
 var app = http.createServer(function (req, res) {
@@ -66,6 +72,7 @@ var app = http.createServer(function (req, res) {
     res.json(404, { reason: 'This not the URL you are looking for', url: req.url });
   }
 });
+
 app.listen(env('PORT'), function() {
-  console.log('Server listen on port %d', app.address().port);
+  eventLogger('server:start', util.format('Gyoji server listen on port %d', app.address().port));
 });
