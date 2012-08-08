@@ -1,8 +1,7 @@
 var
   util = require('util'),
   uuid = require('node-uuid'),
-  EventEmitter = require('events').EventEmitter,
-  pubsub = require('../../common/lib/pubsub');
+  EventEmitter = require('events').EventEmitter;
 
 /**
  * WebSocket wrapper class.
@@ -13,19 +12,19 @@ var Socket = module.exports = function (manager, client) {
   var self = this;
 
   client.on('message', function (message) {
-    self.emit('log', 'Socket::client::message', message);
+    self.emit('log', 'Socket::client::message', self.id, message);
     self._parse(message, function (err, event, applicationId, data) {
       if (err) {
         // ignore error
-        self.emit('log', 'Socket::error', err);
-        return;
+        return self.emit('log', 'Socket::error', self.id, err);
       }
-      self.emit('log', 'Socket::message', event, applicationId, data);
+      self.emit('log', 'Socket::message', self.id, event, applicationId, data);
       self.emit(event, applicationId, data);
     });
   });
 
   client.on('close', function() {
+    self.emit('log', 'Socket::close', self.id);
     manager.disconnect(self);
     self.emit('close');
   });
@@ -62,8 +61,8 @@ Socket.prototype.json = function (obj, callback) {
  * @param {String} eventName
  */
 Socket.prototype.join = function (applicationId, channelName, eventName) {
-  var room = pubsub.makeKey(applicationId, channelName, eventName);
-  this.emit('log', 'Socket::join', room);
+  var room = this._roomKey(applicationId, channelName, eventName);
+  this.emit('log', 'Socket::join', this.id, room);
   this.manager.addToRoom(room, this.id);
 };
 
@@ -75,8 +74,8 @@ Socket.prototype.join = function (applicationId, channelName, eventName) {
  * @param {String} eventName
  */
 Socket.prototype.leave = function (applicationId, channelName, eventName) {
-  var room = pubsub.makeKey(applicationId, channelName, eventName);
-  this.emit('log', 'Socket::leave', room);
+  var room = this._roomKey(applicationId, channelName, eventName);
+  this.emit('log', 'Socket::leave', this.id, room);
   this.manager.removeFromRoom(room, this.id);
 };
 
@@ -92,7 +91,7 @@ Socket.prototype._parse = function (message, callback) {
       applicationId = command.applicationId,
       data = command.data;
 
-    this.emit('log', 'Socket::_parse', message, command);
+    this.emit('log', 'Socket::_parse', this.id, message, command);
 
     if (event && applicationId) {
       callback(null, event, applicationId, data);
@@ -102,4 +101,16 @@ Socket.prototype._parse = function (message, callback) {
   } catch (err) {
     callback(err);
   }
+};
+
+/**
+ * Make room name.
+ *
+ * @param {String} applicationId
+ * @param {String} channelName
+ * @param {String} eventName
+ * @private
+ */
+Socket.prototype._roomKey = function (applicationId, channelName, eventName) {
+  return [applicationId, channelName, eventName].join(':');
 };

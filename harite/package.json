@@ -4,16 +4,21 @@
   "version": "0.1.0",
   "author": "Kazuyuki Honda <hakobera@gmail.com>",
   "dependencies": {
-    "ws": "0.4.18",
+    "ws": "0.4.21",
     "node-uuid": "1.3.3",
-    "hiredis": "0.1.14",
-    "redis": "0.7.2"
+    "aws-snsclient": "0.1.2",
+    "aws2js": "0.7.2"
   },
   "devDependencies": {
     "mocha": "*",
-    "should": "*"
+    "should": "*",
+    "request": "*"
   },
-  "keyword": [ "tuppari", "WebSocket", "aws" ],
+  "keyword": [
+    "tuppari",
+    "WebSocket",
+    "aws"
+  ],
   "repository": "git://github.com/hakobera/tuppari-servers",
   "scripts": {
     "start": "node app.js",
@@ -21,8 +26,7 @@
   },
   "config": {
     "HOST_NAME": "127.0.0.1",
-    "PORT": 5000,
-    "REDIS_URL": "redis://localhost"
+    "PORT": 5000
   },
   "engines": {
     "node": ">= 0.6.0"

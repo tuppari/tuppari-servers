@@ -1,19 +1,15 @@
 var Router = require('router-line').Router,
-  redis = require('redis'),
   uuid = require('node-uuid'),
   parse = require('./parse'),
   db = require('./db'),
+  Publisher = require('./publisher'),
   package = require('../package.json'),
   env = require('../../common/lib/env'),
-  pubsub = require('../../common/lib/pubsub'),
   validation = require('./validation');
 
 var router = module.exports = new Router();
 
-if (env('NODE_ENV') !== 'production') {
-  redis.debug_mode = true;
-}
-var pub = new pubsub.Pub(redis, env('REDIS_URL'));
+var publisher = new Publisher();
 
 /**
  * Return application info.
@@ -232,7 +228,7 @@ router.add('POST', '/messages', function (req, res) {
 
       switch (operation) {
       case 'PublishMessage':
-        pub.publish(applicationId, channel, event, message, function (err) {
+        publisher.publish(applicationId, channel, event, message, function (err, response) {
           if (err) return res.badRequest(err.message);
 
           res.json({
@@ -240,6 +236,8 @@ router.add('POST', '/messages', function (req, res) {
             channel: channel,
             event: event,
             message: message,
+            messageId: response.PublishResult.MessageId,
+            requestId: response.ResponseMetadata.RequestId,
             publishedAt: Date.now()
           });
         });
