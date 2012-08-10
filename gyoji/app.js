@@ -2,7 +2,8 @@ var router = require('./lib/route'),
   env = require('../common/lib/env'),
   http = require('http'),
   url = require('url'),
-  util = require('util');
+  util = require('util'),
+  aws2js = require('aws2js');
 
 var DEBUG = (env('NODE_ENV') !== 'production');
 var debug = function() {
@@ -19,8 +20,24 @@ function eventLogger(eventType) {
   console.log(dateString, eventType, args);
 }
 
+var accessKeyId = env('AWS_ACCESS_KEY_ID');
+var secretAccessKey = env('AWS_SECRET_ACCESS_KEY');
+var errorTopicArn = env('ERROR_TOPIC_ARN');
+
+var sns = aws2js.load('sns', accessKeyId, secretAccessKey);
+sns.setRegion(env('AWS_REGION', 'us-east-1'));
+
+function errorNotify(subject, message) {
+  sns.request('Publish', {
+    Subject: subject,
+    Message: message,
+    TopicArn: errorTopicArn
+  }, function () {});
+}
+
 process.on('uncaughtException', function (err) {
   eventLogger('uncaughtException', err.stack);
+  errorNotify('Gyoji uncaughtException', err.stack);
 });
 
 var app = http.createServer(function (req, res) {
@@ -74,5 +91,7 @@ var app = http.createServer(function (req, res) {
 });
 
 app.listen(env('PORT'), function() {
-  eventLogger('server:start', util.format('Gyoji server listen on port %d', app.address().port));
+  var msg = util.format('Gyoji server listen on port %d', app.address().port);
+  eventLogger('server:start', msg);
+  errorNotify('Gyoji server start', msg);
 });

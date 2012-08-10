@@ -132,6 +132,10 @@
       "Type": "AWS::SNS::Topic"
     },
 
+    "ErrorTopic": {
+      "Type": "AWS::SNS::Topic"
+    },
+
     "SNSPolicy" : {
       "Type" : "AWS::SNS::TopicPolicy",
       "Properties" : {
@@ -152,7 +156,7 @@
               "Resource" : "*"
            }]
         },
-        "Topics" : [ { "Ref" : "SNSTopic" } ]
+        "Topics" : [ { "Ref" : "SNSTopic" }, { "Ref" : "ErrorTopic" } ]
       }
     },
 
@@ -241,6 +245,8 @@
                 "npm config set gyoji:AWS_SECRET_ACCESS_KEY ", { "Fn::GetAtt": [ "HostKeys", "SecretAccessKey" ] } ,"\n",
                 "npm config set gyoji:AWS_REGION ", { "Ref": "AWS::Region" } ,"\n",
                 "npm config set gyoji:SNS_TOPIC_ARN ", { "Ref" : "SNSTopic" }, "\n",
+                "npm config set gyoji:ERROR_TOPIC_ARN ", { "Ref" : "ErrorTopic" }, "\n",
+
                 "npm install --production\n",
                 "cp /tmp/.npmrc /root\n",
 
@@ -380,6 +386,8 @@
                 "npm config set harite:AWS_SECRET_ACCESS_KEY ", { "Fn::GetAtt": [ "HostKeys", "SecretAccessKey" ] } ,"\n",
                 "npm config set harite:AWS_REGION ", { "Ref": "AWS::Region" } ,"\n",
                 "npm config set harite:SNS_TOPIC_ARN ", { "Ref" : "SNSTopic" }, "\n",
+                "npm config set harite:ERROR_TOPIC_ARN ", { "Ref" : "ErrorTopic" }, "\n",
+
                 "npm install --production\n",
                 "cp /tmp/.npmrc /root\n",
 

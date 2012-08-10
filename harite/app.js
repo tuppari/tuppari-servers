@@ -18,9 +18,20 @@ function eventLogger(eventType) {
 var accessKeyId = env('AWS_ACCESS_KEY_ID');
 var secretAccessKey = env('AWS_SECRET_ACCESS_KEY');
 var topicArn = env('SNS_TOPIC_ARN');
+var errorTopicArn = env('ERROR_TOPIC_ARN');
 
 var sns = aws2js.load('sns', accessKeyId, secretAccessKey);
 sns.setRegion(env('AWS_REGION', 'us-east-1'));
+
+var accessKeyId = env('AWS_ACCESS_KEY_ID');
+
+function errorNotify(subject, message) {
+  sns.request('Publish', {
+    Subject: subject,
+    Message: message,
+    TopicArn: errorTopicArn
+  }, function () {});
+}
 
 /*
  * WebSocket settings.
@@ -54,7 +65,9 @@ var io = wss.listen(env('PORT'), function (server, hostName, port) {
     }
   });
 
-  eventLogger('serverStart', util.format('harite server (%s) listen on %d', hostName, port));
+  var msg = util.format('harite server (%s) listen on %d', hostName, port);
+  eventLogger('Harite server start', msg);
+  errorNotify('Harite server start', msg);
 });
 
 io.on('connection', function (socket) {
@@ -86,4 +99,5 @@ if (debug) {
 
 process.on('uncaughtException', function (err) {
   eventLogger('uncaughtException', err.stack);
+  errorNotify('uncaughtException', err.stack)
 });
