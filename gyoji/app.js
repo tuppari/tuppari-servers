@@ -20,6 +20,7 @@ function eventLogger(eventType) {
   console.log(dateString, eventType, args);
 }
 
+var hostName = env('HOST_NAME');
 var accessKeyId = env('AWS_ACCESS_KEY_ID');
 var secretAccessKey = env('AWS_SECRET_ACCESS_KEY');
 var errorTopicArn = env('ERROR_TOPIC_ARN');
@@ -29,7 +30,7 @@ sns.setRegion(env('AWS_REGION', 'us-east-1'));
 
 function errorNotify(subject, message) {
   sns.request('Publish', {
-    Subject: subject,
+    Subject: util.format('[%s]: %s', hostName, subject),
     Message: message,
     TopicArn: errorTopicArn
   }, function () {});
