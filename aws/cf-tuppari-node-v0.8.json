@@ -29,6 +29,13 @@
     "KeyName": {
       "Description": "Name of an existing EC2 KeyPair to enable SSH access to the application server.",
       "Type": "String"
+    },
+
+    "ErrorMailAddress": {
+      "Description": "Mail address that is notified when server start and error eccured.",
+      "Type": "String",
+      "MinLength": "1",
+      "ConstraintDescription": " is required."
     }
 
   },
@@ -86,7 +93,7 @@
       },
 
       "tuppari": {
-        "url": "https://github.com/hakobera/tuppari-servers/zipball/v0.2.0"
+        "url": "https://github.com/hakobera/tuppari-servers/zipball/err-notify"
       }
     }
 
@@ -132,6 +139,18 @@
       "Type": "AWS::SNS::Topic"
     },
 
+    "ErrorTopic": {
+      "Type": "AWS::SNS::Topic",
+      "Properties": {
+        "Subscription": [
+          {
+            "Protocol": "email",
+            "Endpoint": { "Ref": "ErrorMailAddress" }
+          }
+        ]
+      }
+    },
+
     "SNSPolicy" : {
       "Type" : "AWS::SNS::TopicPolicy",
       "Properties" : {
@@ -152,7 +171,7 @@
               "Resource" : "*"
            }]
         },
-        "Topics" : [ { "Ref" : "SNSTopic" } ]
+        "Topics" : [ { "Ref" : "SNSTopic" }, { "Ref" : "ErrorTopic" } ]
       }
     },
 
@@ -233,6 +252,7 @@
 
                 "# Start application\n",
                 "cd /var/opt/tuppari/gyoji\n",
+                "npm config set gyoji:HOST_NAME `curl http://169.254.169.254/latest/meta-data/public-hostname`", "\n",
                 "npm config set gyoji:PORT ", { "Fn::FindInMap": [ "ServerSettings", "gyoji", "port" ] } ,"\n",
                 "npm config set gyoji:ACCOUNT_TABLE_NAME ", { "Ref": "AccountTable" } ,"\n",
                 "npm config set gyoji:APPLICATION_TABLE_NAME ", { "Ref": "ApplicationTable" } ,"\n",
@@ -241,6 +261,8 @@
                 "npm config set gyoji:AWS_SECRET_ACCESS_KEY ", { "Fn::GetAtt": [ "HostKeys", "SecretAccessKey" ] } ,"\n",
                 "npm config set gyoji:AWS_REGION ", { "Ref": "AWS::Region" } ,"\n",
                 "npm config set gyoji:SNS_TOPIC_ARN ", { "Ref" : "SNSTopic" }, "\n",
+                "npm config set gyoji:ERROR_TOPIC_ARN ", { "Ref" : "ErrorTopic" }, "\n",
+
                 "npm install --production\n",
                 "cp /tmp/.npmrc /root\n",
 
@@ -380,6 +402,8 @@
                 "npm config set harite:AWS_SECRET_ACCESS_KEY ", { "Fn::GetAtt": [ "HostKeys", "SecretAccessKey" ] } ,"\n",
                 "npm config set harite:AWS_REGION ", { "Ref": "AWS::Region" } ,"\n",
                 "npm config set harite:SNS_TOPIC_ARN ", { "Ref" : "SNSTopic" }, "\n",
+                "npm config set harite:ERROR_TOPIC_ARN ", { "Ref" : "ErrorTopic" }, "\n",
+
                 "npm install --production\n",
                 "cp /tmp/.npmrc /root\n",
 
