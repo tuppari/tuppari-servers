@@ -29,6 +29,13 @@
     "KeyName": {
       "Description": "Name of an existing EC2 KeyPair to enable SSH access to the application server.",
       "Type": "String"
+    },
+
+    "ErrorMailAddress": {
+      "Description": "Mail address that is notified when server start and error eccured.",
+      "Type": "String",
+      "MinLength": "1",
+      "ConstraintDescription": " is required."
     }
 
   },
@@ -133,7 +140,15 @@
     },
 
     "ErrorTopic": {
-      "Type": "AWS::SNS::Topic"
+      "Type": "AWS::SNS::Topic",
+      "Properties": {
+        "Subscription": [
+          {
+            "Protocol": "email",
+            "Endpoint": { "Ref": "ErrorMailAddress" }
+          }
+        ]
+      }
     },
 
     "SNSPolicy" : {
