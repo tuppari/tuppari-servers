@@ -70,15 +70,13 @@
       "gyoji": {
         "port": 3000,
         "instanceType": "t1.micro",
-        "rootDeviceType": "ebs",
-        "availabilityZone": "a"
+        "rootDeviceType": "ebs"
       },
 
       "harite": {
         "port": 80,
         "instanceType": "t1.micro",
-        "rootDeviceType": "ebs",
-        "availabilityZone": "a"
+        "rootDeviceType": "ebs"
       }
     },
 
@@ -165,7 +163,7 @@
     "GyojiServerElasticLoadBalancer" : {
       "Type" : "AWS::ElasticLoadBalancing::LoadBalancer",
       "Properties" : {
-        "AvailabilityZones" : [ { "Fn::Join" : [ "", [ { "Ref": "AWS::Region" }, { "Fn::FindInMap": [ "ServerSettings", "gyoji", "availabilityZone" ] } ]]} ],
+        "AvailabilityZones" : { "Fn::GetAZs" : "" },
         "Listeners" : [
           {
             "LoadBalancerPort" : "80",
@@ -260,7 +258,7 @@
     "GyojiServerGroup" : {
       "Type" : "AWS::AutoScaling::AutoScalingGroup",
       "Properties" : {
-        "AvailabilityZones" : [ { "Fn::Join" : [ "", [ { "Ref": "AWS::Region" }, { "Fn::FindInMap": [ "ServerSettings", "gyoji", "availabilityZone" ] } ]]} ],
+        "AvailabilityZones" : { "Fn::GetAZs" : "" },
         "LaunchConfigurationName" : { "Ref" : "GyojiServerLaunchConfig" },
         "MinSize" : "2",
         "MaxSize" : "4",
@@ -305,7 +303,7 @@
     "HariteServerElasticLoadBalancer" : {
       "Type" : "AWS::ElasticLoadBalancing::LoadBalancer",
       "Properties" : {
-        "AvailabilityZones" : [ { "Fn::Join" : [ "", [ { "Ref": "AWS::Region" }, { "Fn::FindInMap": [ "ServerSettings", "harite", "availabilityZone" ] } ]]} ],
+        "AvailabilityZones" : { "Fn::GetAZs" : "" },
         "Listeners" : [
           {
             "LoadBalancerPort" : "80",
@@ -399,7 +397,7 @@
     "HariteServerGroup" : {
       "Type" : "AWS::AutoScaling::AutoScalingGroup",
       "Properties" : {
-        "AvailabilityZones" : [ { "Fn::Join" : [ "", [ { "Ref": "AWS::Region" }, { "Fn::FindInMap": [ "ServerSettings", "harite", "availabilityZone" ] } ]]} ],
+        "AvailabilityZones" : { "Fn::GetAZs" : "" },
         "LaunchConfigurationName" : { "Ref" : "HariteServerLaunchConfig" },
         "MinSize" : "2",
         "MaxSize" : "16",
