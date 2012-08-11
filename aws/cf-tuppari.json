@@ -4,50 +4,6 @@
   "Description": "CloudFormation Tuppari Template. **WARNING** This template creates an Amazon EC2 instance. You will be billed for the AWS resources used if you create a stack from this template.",
 
   "Parameters": {
-    "GyojiServerInstanceType": {
-      "Description": "Gyoji server instance type",
-      "Type": "String",
-      "Default": "t1.micro",
-      "AllowedValues": ["t1.micro", "m1.small", "m1.medium", "m1.large", "m1.xlarge", "m2.xlarge", "m2.2xlarge", "m2.4xlarge", "c1.medium", "c1.xlarge"],
-      "ConstraintDescription": "must be a valid EC2 instance type."
-    },
-
-    "HariteServerInstanceType": {
-      "Description": "Harite server instance type",
-      "Type": "String",
-      "Default": "t1.micro",
-      "AllowedValues": ["t1.micro", "m1.small", "m1.medium", "m1.large", "m1.xlarge", "m2.xlarge", "m2.2xlarge", "m2.4xlarge", "c1.medium", "c1.xlarge"],
-      "ConstraintDescription": "must be a valid EC2 instance type."
-    },
-
-    "RootDeviceType": {
-      "Description": "EC2 root device type ('ebs' or 'instanceStore')",
-      "Type": "String",
-      "Default": "ebs",
-      "AllowedValues": ["ebs", "instanceStore"],
-      "ConstraintDescription": "must be 'ebs' or 'instanceStore."
-    },
-
-    "KeyName": {
-      "Description": "Name of an existing EC2 KeyPair to enable SSH access to the application server.",
-      "Type": "String"
-    },
-
-    "GyojiServerPort": {
-      "Description": "TCP/IP port of the administration server.",
-      "Type": "Number",
-      "Default": 3000,
-      "MinValue": 300,
-      "ConstraintDescription": "must be number and greater than well-known port number (> 1024)."
-    },
-
-    "HariteServerPort": {
-      "Description": "TCP/IP port of the broadcast server.",
-      "Type": "Number",
-      "Default": 80,
-      "MinValue": 80,
-      "ConstraintDescription": "must be number and greater than well-known port number (> 1024)."
-    },
 
     "AccountTable": {
       "Description": "Account table name of DynamoDB",
@@ -70,16 +26,14 @@
       "ConstraintDescription": " is required."
     },
 
-    "AppURL": {
-      "Description": "Application zip/tarball URL",
-      "Type": "String",
-      "ConstraintDescription": " is required."
+    "KeyName": {
+      "Description": "Name of an existing EC2 KeyPair to enable SSH access to the application server.",
+      "Type": "String"
     },
 
-    "AvailabilityZone": {
-      "Description": "Availability Zone ID",
+    "ErrorMailAddress": {
+      "Description": "Mail address that is notified when server start and error eccured.",
       "Type": "String",
-      "Default": "a",
       "MinLength": "1",
       "ConstraintDescription": " is required."
     }
@@ -117,7 +71,32 @@
         "ebs": "ami-a6855bbb",
         "instanceStore": "ami-ae855bb3"
       }
+    },
+
+    "ServerSettings": {
+      "gyoji": {
+        "port": 3000,
+        "instanceType": "t1.micro",
+        "rootDeviceType": "ebs"
+      },
+
+      "harite": {
+        "port": 80,
+        "instanceType": "t1.micro",
+        "rootDeviceType": "ebs"
+      }
+    },
+
+    "Packages": {
+      "nodejs": {
+        "version": "0.8.6"
+      },
+
+      "tuppari": {
+        "url": "https://github.com/hakobera/tuppari-servers/zipball/v0.2.2"
+      }
     }
+
   },
 
   "Resources": {
@@ -160,6 +139,18 @@
       "Type": "AWS::SNS::Topic"
     },
 
+    "ErrorTopic": {
+      "Type": "AWS::SNS::Topic",
+      "Properties": {
+        "Subscription": [
+          {
+            "Protocol": "email",
+            "Endpoint": { "Ref": "ErrorMailAddress" }
+          }
+        ]
+      }
+    },
+
     "SNSPolicy" : {
       "Type" : "AWS::SNS::TopicPolicy",
       "Properties" : {
@@ -180,7 +171,7 @@
               "Resource" : "*"
            }]
         },
-        "Topics" : [ { "Ref" : "SNSTopic" } ]
+        "Topics" : [ { "Ref" : "SNSTopic" }, { "Ref" : "ErrorTopic" } ]
       }
     },
 
@@ -191,20 +182,20 @@
     "GyojiServerElasticLoadBalancer" : {
       "Type" : "AWS::ElasticLoadBalancing::LoadBalancer",
       "Properties" : {
-        "AvailabilityZones" : [ { "Fn::Join" : [ "", [ { "Ref": "AWS::Region" }, { "Ref": "AvailabilityZone" } ]]} ],
+        "AvailabilityZones" : { "Fn::GetAZs" : "" },
         "Listeners" : [
           {
             "LoadBalancerPort" : "80",
-            "InstancePort" : { "Ref" : "GyojiServerPort" },
+            "InstancePort" : { "Fn::FindInMap": [ "ServerSettings", "gyoji", "port" ] },
             "Protocol" : "HTTP"
           }
         ],
         "HealthCheck" : {
-          "Target" : { "Fn::Join" : [ "", ["HTTP:", { "Ref" : "GyojiServerPort" }, "/info"]]},
+          "Target" : { "Fn::Join" : [ "", ["HTTP:", { "Fn::FindInMap": [ "ServerSettings", "gyoji", "port" ] }, "/info"]]},
           "HealthyThreshold" : "2",
-          "UnhealthyThreshold" : "3",
-          "Interval" : "15",
-          "Timeout" : "10"
+          "UnhealthyThreshold" : "4",
+          "Interval" : "60",
+          "Timeout" : "30"
         }
       }
     },
@@ -215,27 +206,23 @@
         "AWS::CloudFormation::Init": {
           "config": {
             "packages": {
-              "rpm" : {
-                "nodejs" : "http://nodejs.tchol.org/repocfg/amzn1/nodejs-stable-release.noarch.rpm"
-              },
               "yum": {
                 "gcc-c++": [],
                 "make": [],
-                "nodejs-compat-symlinks": [],
-                "npm": [],
                 "libxml2-devel": []
               }
             },
 
             "sources" : {
-              "/var/opt/tuppari" : { "Ref": "AppURL" }
+              "/var/opt/tuppari" : { "Fn::FindInMap": [ "Packages", "tuppari", "url" ] },
+              "/var/opt/nodejs": { "Fn::Join" : [ "", [ "http://nodejs.org/dist/v", { "Fn::FindInMap": [ "Packages", "nodejs", "version" ] }, "/node-v", { "Fn::FindInMap": [ "Packages", "nodejs", "version" ] }, "-linux-x64.tar.gz"  ]] }
             }
           }
         }
       },
       "Properties": {
-        "ImageId": { "Fn::FindInMap": [ "AWSRegionArch2AMI", { "Ref": "AWS::Region" }, { "Ref": "RootDeviceType" } ] },
-        "InstanceType": { "Ref": "GyojiServerInstanceType" },
+        "ImageId": { "Fn::FindInMap": [ "AWSRegionArch2AMI", { "Ref": "AWS::Region" }, { "Fn::FindInMap": [ "ServerSettings", "gyoji", "rootDeviceType" ] } ] },
+        "InstanceType": { "Fn::FindInMap": [ "ServerSettings", "gyoji", "instanceType" ] },
         "SecurityGroups": [ { "Ref": "GyojiServerSecurityGroup" } ],
         "KeyName": { "Ref": "KeyName" },
         "UserData": {
@@ -260,16 +247,22 @@
 
                 "ulimit -n 65535\n",
 
+                "ln -s /var/opt/nodejs/", "/node-v", { "Fn::FindInMap": [ "Packages", "nodejs", "version" ] }, "-linux-x86_64/bin/node /usr/bin/node\n",
+                "ln -s /var/opt/nodejs/", "/node-v", { "Fn::FindInMap": [ "Packages", "nodejs", "version" ] }, "-linux-x86_64/bin/npm /usr/bin/npm\n",
+
                 "# Start application\n",
                 "cd /var/opt/tuppari/gyoji\n",
-                "npm config set gyoji:PORT ", { "Ref": "GyojiServerPort" } ,"\n",
+                "npm config set gyoji:HOST_NAME `curl http://169.254.169.254/latest/meta-data/public-hostname`", "\n",
+                "npm config set gyoji:PORT ", { "Fn::FindInMap": [ "ServerSettings", "gyoji", "port" ] } ,"\n",
                 "npm config set gyoji:ACCOUNT_TABLE_NAME ", { "Ref": "AccountTable" } ,"\n",
                 "npm config set gyoji:APPLICATION_TABLE_NAME ", { "Ref": "ApplicationTable" } ,"\n",
                 "npm config set gyoji:KEYPAIR_TABLE_NAME ", { "Ref": "KeypairTable" } ,"\n",
                 "npm config set gyoji:AWS_ACCESS_KEY_ID ",  { "Ref": "HostKeys" } ,"\n",
-                "npm config set gyoji:AWS_SECRET_ACCESS_KEY ", { "Fn::GetAtt": ["HostKeys", "SecretAccessKey"] } ,"\n",
+                "npm config set gyoji:AWS_SECRET_ACCESS_KEY ", { "Fn::GetAtt": [ "HostKeys", "SecretAccessKey" ] } ,"\n",
                 "npm config set gyoji:AWS_REGION ", { "Ref": "AWS::Region" } ,"\n",
                 "npm config set gyoji:SNS_TOPIC_ARN ", { "Ref" : "SNSTopic" }, "\n",
+                "npm config set gyoji:ERROR_TOPIC_ARN ", { "Ref" : "ErrorTopic" }, "\n",
+
                 "npm install --production\n",
                 "cp /tmp/.npmrc /root\n",
 
@@ -287,7 +280,7 @@
     "GyojiServerGroup" : {
       "Type" : "AWS::AutoScaling::AutoScalingGroup",
       "Properties" : {
-        "AvailabilityZones" : [ { "Fn::Join" : [ "", [ { "Ref": "AWS::Region" }, { "Ref": "AvailabilityZone" } ]]} ],
+        "AvailabilityZones" : { "Fn::GetAZs" : "" },
         "LaunchConfigurationName" : { "Ref" : "GyojiServerLaunchConfig" },
         "MinSize" : "2",
         "MaxSize" : "4",
@@ -295,7 +288,12 @@
         "Tags" : [
           {
             "Key" : "Name",
-            "Value" : { "Fn::Join" : [ "", [ { "Ref": "AWS::StackName" }, "::GyojiServer::", { "Ref": "AppURL" } ]] },
+            "Value" : { "Fn::Join" : [ "", [ { "Ref": "AWS::StackName" }, "::GyojiServer" ]] },
+            "PropagateAtLaunch" : "true"
+          },
+          {
+            "Key": "AppURL",
+            "Value": { "Fn::FindInMap": [ "Packages", "tuppari", "url" ] },
             "PropagateAtLaunch" : "true"
           }
         ]
@@ -315,8 +313,8 @@
           },
           {
             "IpProtocol": "tcp",
-            "FromPort": { "Ref": "GyojiServerPort" },
-            "ToPort": { "Ref": "GyojiServerPort" },
+            "FromPort": { "Fn::FindInMap": [ "ServerSettings", "gyoji", "port" ] },
+            "ToPort": { "Fn::FindInMap": [ "ServerSettings", "gyoji", "port" ] },
             "SourceSecurityGroupOwnerId" : {"Fn::GetAtt" : ["GyojiServerElasticLoadBalancer", "SourceSecurityGroup.OwnerAlias"]},
             "SourceSecurityGroupName" : {"Fn::GetAtt" : ["GyojiServerElasticLoadBalancer", "SourceSecurityGroup.GroupName"]}
           }
@@ -327,20 +325,20 @@
     "HariteServerElasticLoadBalancer" : {
       "Type" : "AWS::ElasticLoadBalancing::LoadBalancer",
       "Properties" : {
-        "AvailabilityZones" : [ { "Fn::Join" : [ "", [ { "Ref": "AWS::Region" }, { "Ref": "AvailabilityZone" } ]]} ],
+        "AvailabilityZones" : { "Fn::GetAZs" : "" },
         "Listeners" : [
           {
             "LoadBalancerPort" : "80",
-            "InstancePort" : { "Ref" : "HariteServerPort" },
-            "Protocol" : "TCP"
+            "InstancePort" : { "Fn::FindInMap": [ "ServerSettings", "harite", "port" ] },
+            "Protocol" : "HTTP"
           }
         ],
         "HealthCheck" : {
-          "Target" : { "Fn::Join" : [ "", ["HTTP:", { "Ref" : "HariteServerPort" }, "/"]]},
+          "Target" : { "Fn::Join" : [ "", ["HTTP:", { "Fn::FindInMap": [ "ServerSettings", "harite", "port" ] }, "/"]]},
           "HealthyThreshold" : "2",
-          "UnhealthyThreshold" : "3",
-          "Interval" : "15",
-          "Timeout" : "10"
+          "UnhealthyThreshold" : "4",
+          "Interval" : "60",
+          "Timeout" : "30"
         }
       }
     },
@@ -351,27 +349,23 @@
         "AWS::CloudFormation::Init": {
           "config": {
             "packages": {
-              "rpm" : {
-                "nodejs" : "http://nodejs.tchol.org/repocfg/amzn1/nodejs-stable-release.noarch.rpm"
-              },
               "yum": {
                 "gcc-c++": [],
                 "make": [],
-                "nodejs-compat-symlinks": [],
-                "npm": [],
                 "libxml2-devel": []
               }
             },
 
             "sources" : {
-              "/var/opt/tuppari": { "Ref": "AppURL" }
+              "/var/opt/tuppari": { "Fn::FindInMap": [ "Packages", "tuppari", "url" ] },
+              "/var/opt/nodejs": { "Fn::Join" : [ "", [ "http://nodejs.org/dist/v", { "Fn::FindInMap": [ "Packages", "nodejs", "version" ] }, "/node-v", { "Fn::FindInMap": [ "Packages", "nodejs", "version" ] }, "-linux-x64.tar.gz"  ]] }
             }
           }
         }
       },
       "Properties": {
-        "ImageId": { "Fn::FindInMap": [ "AWSRegionArch2AMI", { "Ref": "AWS::Region" }, { "Ref": "RootDeviceType" } ] },
-        "InstanceType": { "Ref": "HariteServerInstanceType" },
+        "ImageId": { "Fn::FindInMap": [ "AWSRegionArch2AMI", { "Ref": "AWS::Region" }, { "Fn::FindInMap": [ "ServerSettings", "harite", "rootDeviceType" ] } ] },
+        "InstanceType": { "Fn::FindInMap": [ "ServerSettings", "harite", "instanceType" ] },
         "SecurityGroups": [ { "Ref": "HariteServerSecurityGroup" } ],
         "KeyName": { "Ref": "KeyName" },
         "SpotPrice": "0.1",
@@ -397,14 +391,19 @@
 
                 "ulimit -n 65535\n",
 
+                "ln -s /var/opt/nodejs/", "/node-v", { "Fn::FindInMap": [ "Packages", "nodejs", "version" ] }, "-linux-x86_64/bin/node /usr/bin/node\n",
+                "ln -s /var/opt/nodejs/", "/node-v", { "Fn::FindInMap": [ "Packages", "nodejs", "version" ] }, "-linux-x86_64/bin/npm /usr/bin/npm\n",
+
                 "# Start application\n",
                 "cd /var/opt/tuppari/harite\n",
                 "npm config set harite:HOST_NAME `curl http://169.254.169.254/latest/meta-data/public-hostname`", "\n",
-                "npm config set harite:PORT ", { "Ref": "HariteServerPort" }, "\n",
+                "npm config set harite:PORT ", { "Fn::FindInMap": [ "ServerSettings", "harite", "port" ] }, "\n",
                 "npm config set harite:AWS_ACCESS_KEY_ID ",  { "Ref": "HostKeys" } ,"\n",
-                "npm config set harite:AWS_SECRET_ACCESS_KEY ", { "Fn::GetAtt": ["HostKeys", "SecretAccessKey"] } ,"\n",
+                "npm config set harite:AWS_SECRET_ACCESS_KEY ", { "Fn::GetAtt": [ "HostKeys", "SecretAccessKey" ] } ,"\n",
                 "npm config set harite:AWS_REGION ", { "Ref": "AWS::Region" } ,"\n",
                 "npm config set harite:SNS_TOPIC_ARN ", { "Ref" : "SNSTopic" }, "\n",
+                "npm config set harite:ERROR_TOPIC_ARN ", { "Ref" : "ErrorTopic" }, "\n",
+
                 "npm install --production\n",
                 "cp /tmp/.npmrc /root\n",
 
@@ -422,7 +421,7 @@
     "HariteServerGroup" : {
       "Type" : "AWS::AutoScaling::AutoScalingGroup",
       "Properties" : {
-        "AvailabilityZones" : [ { "Fn::Join" : [ "", [ { "Ref": "AWS::Region" }, { "Ref": "AvailabilityZone" } ]]} ],
+        "AvailabilityZones" : { "Fn::GetAZs" : "" },
         "LaunchConfigurationName" : { "Ref" : "HariteServerLaunchConfig" },
         "MinSize" : "2",
         "MaxSize" : "16",
@@ -430,7 +429,12 @@
         "Tags" : [
           {
             "Key" : "Name",
-            "Value" : { "Fn::Join" : [ "", [ { "Ref": "AWS::StackName" }, "::HariteServer::", { "Ref": "AppURL" } ]] },
+            "Value" : { "Fn::Join" : [ "", [ { "Ref": "AWS::StackName" }, "::HariteServer" ]] },
+            "PropagateAtLaunch" : "true"
+          },
+          {
+            "Key": "AppURL",
+            "Value": { "Fn::FindInMap": [ "Packages", "tuppari", "url" ] },
             "PropagateAtLaunch" : "true"
           }
         ]
@@ -470,8 +474,14 @@
           },
           {
             "IpProtocol": "tcp",
-            "FromPort": { "Ref": "HariteServerPort" },
-            "ToPort": { "Ref": "HariteServerPort" },
+            "FromPort": 843,
+            "ToPort": 843,
+            "CidrIp": "0.0.0.0/0"
+          },
+          {
+            "IpProtocol": "tcp",
+            "FromPort": { "Fn::FindInMap": [ "ServerSettings", "harite", "port" ] },
+            "ToPort": { "Fn::FindInMap": [ "ServerSettings", "harite", "port" ] },
             "CidrIp": "0.0.0.0/0"
           }
         ]
@@ -481,13 +491,13 @@
     "CPUAlarmHigh": {
      "Type": "AWS::CloudWatch::Alarm",
      "Properties": {
-        "AlarmDescription": "Scale-up if CPU > 90% for 10 minutes",
+        "AlarmDescription": "Scale-up if CPU > 90% for 8 minutes",
         "MetricName": "CPUUtilization",
         "Namespace": "AWS/EC2",
         "Statistic": "Average",
         "Period": "120",
-        "EvaluationPeriods": "2",
-        "Threshold": "70",
+        "EvaluationPeriods": "4",
+        "Threshold": "90",
         "AlarmActions": [ { "Ref": "HariteServerScaleUpPolicy" } ],
         "Dimensions": [
           {
@@ -502,12 +512,12 @@
     "CPUAlarmLow": {
      "Type": "AWS::CloudWatch::Alarm",
      "Properties": {
-        "AlarmDescription": "Scale-down if CPU < 70% for 10 minutes",
+        "AlarmDescription": "Scale-down if CPU < 30% for 10 minutes",
         "MetricName": "CPUUtilization",
         "Namespace": "AWS/EC2",
         "Statistic": "Average",
         "Period": "120",
-        "EvaluationPeriods": "2",
+        "EvaluationPeriods": "4",
         "Threshold": "30",
         "AlarmActions": [ { "Ref": "HariteServerScaleDownPolicy" } ],
         "Dimensions": [
@@ -533,7 +543,7 @@
     },
     "AppURL": {
       "Description": "URL of the application zip/tarball",
-      "Value": { "Ref": "AppURL" }
+      "Value": { "Fn::FindInMap": [ "Packages", "tuppari", "url" ] }
     },
     "SNSTopic": {
       "Description": "SNS Topic ARN",
