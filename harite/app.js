@@ -68,7 +68,7 @@ var io = wss.listen(env('PORT'), function (server, hostName, port) {
    * Flash socket settings.
    */
   var pf = require('policyfile').createServer();
-  pf.listen(10081, server);
+  pf.listen(843, server);
 
   var msg = util.format('harite server listen on %d', port);
   eventLogger('Harite server start', msg);
