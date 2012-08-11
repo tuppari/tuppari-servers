@@ -30,7 +30,7 @@ sns.setRegion(env('AWS_REGION', 'us-east-1'));
 
 function errorNotify(subject, message) {
   sns.request('Publish', {
-    Subject: util.format('[%s]: %s', hostName, subject),
+    Subject: util.format('%s [gyoji:%s]', subject, hostName),
     Message: message,
     TopicArn: errorTopicArn
   }, function () {});
@@ -38,7 +38,7 @@ function errorNotify(subject, message) {
 
 process.on('uncaughtException', function (err) {
   eventLogger('uncaughtException', err.stack);
-  errorNotify('Gyoji uncaughtException', err.stack);
+  errorNotify('uncaughtException', err.stack);
 });
 
 var app = http.createServer(function (req, res) {
@@ -80,6 +80,8 @@ var app = http.createServer(function (req, res) {
         handler(req, res, r.params);
       } catch (e) {
         res.json(500, { reason: 'Unexpected error', url: req.url });
+        errorLogger('Unexpected error', req.url, e.message);
+        errorNotify('Unexpected error', util.format('%s %s', req.url, e.message));
       }
     } else if (typeof handler === 'string') {
       res.send(200, 'text/plain', handler);
@@ -94,5 +96,5 @@ var app = http.createServer(function (req, res) {
 app.listen(env('PORT'), function() {
   var msg = util.format('Gyoji server listen on port %d', app.address().port);
   eventLogger('server:start', msg);
-  errorNotify('Gyoji server start', msg);
+  errorNotify('server:start', msg);
 });

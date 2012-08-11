@@ -93,7 +93,7 @@
       },
 
       "tuppari": {
-        "url": "https://github.com/hakobera/tuppari-servers/zipball/v0.2.1"
+        "url": "https://github.com/hakobera/tuppari-servers/zipball/flashsocket"
       }
     }
 
@@ -193,9 +193,9 @@
         "HealthCheck" : {
           "Target" : { "Fn::Join" : [ "", ["HTTP:", { "Fn::FindInMap": [ "ServerSettings", "gyoji", "port" ] }, "/info"]]},
           "HealthyThreshold" : "2",
-          "UnhealthyThreshold" : "3",
-          "Interval" : "15",
-          "Timeout" : "10"
+          "UnhealthyThreshold" : "4",
+          "Interval" : "60",
+          "Timeout" : "30"
         }
       }
     },
@@ -330,15 +330,15 @@
           {
             "LoadBalancerPort" : "80",
             "InstancePort" : { "Fn::FindInMap": [ "ServerSettings", "harite", "port" ] },
-            "Protocol" : "TCP"
+            "Protocol" : "HTTP"
           }
         ],
         "HealthCheck" : {
           "Target" : { "Fn::Join" : [ "", ["HTTP:", { "Fn::FindInMap": [ "ServerSettings", "harite", "port" ] }, "/"]]},
           "HealthyThreshold" : "2",
-          "UnhealthyThreshold" : "3",
-          "Interval" : "15",
-          "Timeout" : "10"
+          "UnhealthyThreshold" : "4",
+          "Interval" : "60",
+          "Timeout" : "30"
         }
       }
     },
@@ -474,6 +474,12 @@
           },
           {
             "IpProtocol": "tcp",
+            "FromPort": 843,
+            "ToPort": 843,
+            "CidrIp": "0.0.0.0/0"
+          },
+          {
+            "IpProtocol": "tcp",
             "FromPort": { "Fn::FindInMap": [ "ServerSettings", "harite", "port" ] },
             "ToPort": { "Fn::FindInMap": [ "ServerSettings", "harite", "port" ] },
             "CidrIp": "0.0.0.0/0"
@@ -485,13 +491,13 @@
     "CPUAlarmHigh": {
      "Type": "AWS::CloudWatch::Alarm",
      "Properties": {
-        "AlarmDescription": "Scale-up if CPU > 90% for 10 minutes",
+        "AlarmDescription": "Scale-up if CPU > 90% for 8 minutes",
         "MetricName": "CPUUtilization",
         "Namespace": "AWS/EC2",
         "Statistic": "Average",
         "Period": "120",
-        "EvaluationPeriods": "2",
-        "Threshold": "70",
+        "EvaluationPeriods": "4",
+        "Threshold": "90",
         "AlarmActions": [ { "Ref": "HariteServerScaleUpPolicy" } ],
         "Dimensions": [
           {
@@ -506,12 +512,12 @@
     "CPUAlarmLow": {
      "Type": "AWS::CloudWatch::Alarm",
      "Properties": {
-        "AlarmDescription": "Scale-down if CPU < 70% for 10 minutes",
+        "AlarmDescription": "Scale-down if CPU < 30% for 10 minutes",
         "MetricName": "CPUUtilization",
         "Namespace": "AWS/EC2",
         "Statistic": "Average",
         "Period": "120",
-        "EvaluationPeriods": "2",
+        "EvaluationPeriods": "4",
         "Threshold": "30",
         "AlarmActions": [ { "Ref": "HariteServerScaleDownPolicy" } ],
         "Dimensions": [

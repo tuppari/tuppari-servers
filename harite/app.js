@@ -26,11 +26,16 @@ sns.setRegion(env('AWS_REGION', 'us-east-1'));
 
 function errorNotify(subject, message) {
   sns.request('Publish', {
-    Subject: util.format('[%s]: %s', hostName, subject),
+    Subject: util.format('%s [harite:%s]', subject, hostName),
     Message: message,
     TopicArn: errorTopicArn
   }, function () {});
 }
+
+process.on('uncaughtException', function (err) {
+  eventLogger('uncaughtException', err.stack);
+  errorNotify('uncaughtException', err.stack)
+});
 
 /*
  * WebSocket settings.
@@ -57,12 +62,19 @@ var io = wss.listen(env('PORT'), function (server, hostName, port) {
     TopicArn: topicArn
   }, function (err, response) {
     if (err) {
-      eventLogger('subscribe:error', err);
+      eventLogger('sns:subscribe:error', err);
+      errorNotify('sns:subscribe:error', err);
       server.close();
     } else {
-      eventLogger('subscribe:success', response);
+      eventLogger('sns:subscribe:success', response);
     }
   });
+
+  /**
+   * Flash socket settings.
+   */
+  var pf = require('policyfile').createServer();
+  pf.listen(843, server);
 
   var msg = util.format('harite server listen on %d', port);
   eventLogger('Harite server start', msg);
@@ -80,11 +92,12 @@ io.on('connection', function (socket) {
 });
 
 /*
- * Redis settings.
+ * Subscriber settings.
  */
 
 subscriber.on('error', function (err) {
-  eventLogger('subscribe:error', err.stack);
+  eventLogger('subscriber:error', err.stack);
+  errorNotify('subscriber:error', err.stack);
 });
 
 subscriber.on('message', function (key, data) {
@@ -95,8 +108,3 @@ if (debug) {
   io.on('log', eventLogger);
   subscriber.on('log', eventLogger);
 }
-
-process.on('uncaughtException', function (err) {
-  eventLogger('uncaughtException', err.stack);
-  errorNotify('uncaughtException', err.stack)
-});
