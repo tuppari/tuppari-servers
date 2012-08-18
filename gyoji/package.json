@@ -1,7 +1,7 @@
 {
   "name": "gyoji",
   "description": "The administration server of Tuppari (= experimental implimentation of unbreakable message broadcasting system using WebSocket and Amazon Web Services)",
-  "version": "0.2.2",
+  "version": "0.2.3",
   "author": "Kazuyuki Honda <hakobera@gmail.com>",
   "dependencies": {
     "tuppari": "0.1.1",
@@ -10,7 +10,8 @@
     "dynamo": "0.2.13",
     "async": "0.1.22",
     "debug": "0.7.0",
-    "aws2js": "0.7.0"
+    "aws2js": "0.7.0",
+    "lru-cache": "~2.0.1"
   },
   "devDependencies": {
     "mocha": "*",

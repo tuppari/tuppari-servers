@@ -1,7 +1,10 @@
 var Schema = require('./schema'),
   util = require('util'),
-  uuid = require('node-uuid')
-;
+  uuid = require('node-uuid'),
+  LRU = require('lru-cache');
+
+var CACHE_SIZE = 500;
+var cache = LRU(CACHE_SIZE);
 
 /**
  * Keypair table.
@@ -47,11 +50,29 @@ Keypair.prototype.create = function (applicationId, callback) {
  * @param {Function(err, keypair)}callback
  */
 Keypair.prototype.find = function (applicationId, accessKeyId, callback) {
-  var key = {
-    applicationId: applicationId,
-    accessKeyId: accessKeyId
-  };
-  return this.findByKey(key, callback);
+  var cacheKey = applicationId + ':' + accessKeyId;
+  var keypair = cache.get(cacheKey);
+
+  if (keypair) {
+    process.nextTick(function () {
+      keypair.cached = true;
+      callback(null, keypair);
+    });
+  } else {
+    var key = {
+      applicationId: applicationId,
+      accessKeyId: accessKeyId
+    };
+
+    this.findByKey(key, function (err, data) {
+      if (err) return callback(err);
+
+      if (data) {
+        cache.set(cacheKey, data);
+      }
+      callback(null, data);
+    });
+  }
 };
 
 /**
@@ -65,14 +86,14 @@ Keypair.prototype.findByApplicationIds = function (applicationIds, callback) {
     process.nextTick(function () {
       callback(null, []);
     });
+  } else {
+    var pred = {
+      applicationId: { 'in': applicationIds }
+    };
+
+    this
+      .table
+      .scan(pred)
+      .fetch(callback);
   }
-
-  var pred = {
-    applicationId: { 'in': applicationIds }
-  };
-
-  this
-    .table
-    .scan(pred)
-    .fetch(callback);
 };

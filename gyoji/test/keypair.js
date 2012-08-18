@@ -98,4 +98,36 @@ describe('db.keypair', function () {
     })
   })
 
+  describe('find()', function () {
+    it('should return cached object if find() called before', function (done) {
+      var applicationId = uuid.v1();
+
+      db.keypair.create(applicationId, function (err, keypair) {
+        if (err) return done(err);
+
+        should.exist(keypair);
+        keypair.applicationId.should.eql(applicationId);
+        should.exist(keypair.accessKeyId);
+        should.exist(keypair.accessSecretKey);
+
+        db.keypair.find(applicationId, keypair.accessKeyId, function (err, data) {
+          if (err) return done(err);
+          data.applicationId.should.eql(applicationId);
+          data.accessKeyId.should.eql(keypair.accessKeyId);
+          data.accessSecretKey.should.eql(keypair.accessSecretKey);
+          should.not.exist(data.cached);
+
+          db.keypair.find(applicationId, keypair.accessKeyId, function (err, data) {
+            data.applicationId.should.eql(applicationId);
+            data.accessKeyId.should.eql(keypair.accessKeyId);
+            data.accessSecretKey.should.eql(keypair.accessSecretKey);
+            data.cached.should.be.true;
+
+            done();
+          });
+        });
+      });
+    })
+  })
+
 })
